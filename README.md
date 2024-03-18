@@ -6,6 +6,24 @@ https://youtu.be/hSxmEZjCPP8?si=ps__eK0MbuSDFPXw
 
 Left at 14:01
 
+## Notes
+
+Since `ChatJob` generates an html string for the message chunks, need to configure this as a content source for Tailwind, otherwise, the referenced Tailwind classes will not get included in the Tailwind build and generated css:
+
+```javascript
+// config/tailwind.config.js
+module.exports = {
+  content: [
+    ...
+    './app/jobs/**/*.rb',
+  ],
+  ...
+}
+
+```
+
+## TBD
+
 This README would normally document whatever steps are necessary to get the
 application up and running.
 
@@ -40,3 +58,5 @@ Things you may want to cover:
 * Would the ChatJob http code be easier to read with Faraday? It does support [streaming responses](https://lostisland.github.io/faraday/#/adapters/custom/streaming)
 * Mixing of logic and presentation concerns in `ChatJob#message_div` - could this be pulled out into a stream erb response that accepts the rand hex number as a local?
 * Is Redis needed for ActionCable re: `Turbo::StreamsChannel.broadcast_append_to "welcome", target:, html: message` in `ChatJob`?
+* If there are multiple clients (eg: open several browsers/tabs), it broadcasts to *all* of them
+* It wipes out each question the user asked
