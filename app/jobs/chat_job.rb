@@ -44,7 +44,7 @@ class ChatJob < ApplicationJob
   end
 
   def message_div(rand)
-    "<div id='#{rand}' class='border border-blue-500 bg-blue-50 text-blue-500 p-2 rounded-xl mb-2'></div>"
+    "<div id='#{rand}' class='border border-blue-500 bg-blue-100 text-blue-800 p-2 rounded-xl mb-2'></div>"
   end
 
   # Find DOM element with `id` of `target` and append message (which is some html content) to it.

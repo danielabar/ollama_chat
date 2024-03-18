@@ -4,7 +4,7 @@ Tutorial from (insert link tbd) for building a streaming ai chatbot with Rails a
 
 https://youtu.be/hSxmEZjCPP8?si=ps__eK0MbuSDFPXw
 
-Left at 14:01
+Left at 24:00
 
 ## Notes
 
