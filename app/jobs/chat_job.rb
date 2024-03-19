@@ -43,8 +43,15 @@ class ChatJob < ApplicationJob
     "[INST]#{prompt}[/INST]"
   end
 
+  # Use heredoc because it supports multi-line html for legibility
   def message_div(rand)
-    "<div id='#{rand}' class='border border-blue-500 bg-blue-100 text-blue-800 p-2 rounded-xl mb-2'></div>"
+    <<~HTML
+      <div id='#{rand}'
+           data-controller='markdown-text'
+           data-markdown-text-updated-value=''
+           class='border border-blue-500 bg-blue-100 text-blue-800 p-2 rounded-xl mb-2'>
+      </div>
+    HTML
   end
 
   # Find DOM element with `id` of `target` and append message (which is some html content) to it.
@@ -61,8 +68,20 @@ class ChatJob < ApplicationJob
     message = json["response"].to_s.strip.empty? ? "<br/>" : json["response"]
     if done
       Rails.logger.info("🎉 Done streaming response.")
+      message = build_markdown_updater(rand)
+      broadcast_message(rand, message)
     else
       broadcast_message(rand, message)
     end
+  end
+
+  # The stimulus controller will perform some action anytime the markdown-text-update-value is updated
+  # So basically, this is the back end streaming triggerring the stimulus controller to do something
+  def build_markdown_updater(rand)
+    <<~HTML
+      <script>
+        document.getElementById('#{rand}').dataset.markdownTextUpdatedValue = '#{Time.current.to_f}'
+      </script>
+    HTML
   end
 end

@@ -19,8 +19,19 @@ module.exports = {
   ],
   ...
 }
-
 ```
+
+How to use `marked` and `highlight.js` JS libraries with importmap?
+
+```bash
+bin/importmap pin marked
+# Pinning "marked" to vendor/javascript/marked.js via download from https://ga.jspm.io/npm:marked@12.0.1/lib/marked.esm.js
+
+bin/importmap pin highlight.js
+#Pinning "highlight.js" to vendor/javascript/highlight.js.js via download from https://ga.jspm.io/npm:highlight.js@11.9.0/es/index.js
+```
+
+Actually for highlight, see this: https://stackoverflow.com/questions/77539248/adding-highlightjs-to-rails-7-1-with-importmaps
 
 ## TBD
 
@@ -60,3 +71,4 @@ Things you may want to cover:
 * Mixing of logic and presentation concerns in `ChatJob#message_div` - could this be pulled out into a stream erb response that accepts the rand hex number as a local?
 * Is Redis needed for ActionCable re: `Turbo::StreamsChannel.broadcast_append_to "welcome", target:, html: message` in `ChatJob`?
 * If there are multiple clients (eg: open several browsers/tabs), it broadcasts to *all* of them - use signed stream and detect signed in user? See https://www.hotrails.dev/turbo-rails/turbo-streams-security
+* If using a strict form of CSP, the injected inline script from ChatJob might get rejected?
