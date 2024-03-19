@@ -33,6 +33,8 @@ bin/importmap pin highlight.js
 
 Actually for highlight, see this: https://stackoverflow.com/questions/77539248/adding-highlightjs-to-rails-7-1-with-importmaps
 
+Also need CSS for highlight.js: https://www.npmjs.com/package/highlight.js#es6-modules-
+
 ## TBD
 
 This README would normally document whatever steps are necessary to get the
@@ -72,3 +74,5 @@ Things you may want to cover:
 * Is Redis needed for ActionCable re: `Turbo::StreamsChannel.broadcast_append_to "welcome", target:, html: message` in `ChatJob`?
 * If there are multiple clients (eg: open several browsers/tabs), it broadcasts to *all* of them - use signed stream and detect signed in user? See https://www.hotrails.dev/turbo-rails/turbo-streams-security
 * If using a strict form of CSP, the injected inline script from ChatJob might get rejected?
+* Code indentation? Prism.js?
+* Context? See Ollama REST API: https://github.com/ollama/ollama/blob/main/docs/api.md
