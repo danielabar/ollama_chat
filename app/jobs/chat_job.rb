@@ -71,7 +71,6 @@ class ChatJob < ApplicationJob
     if done
       Rails.logger.info("🎉 Done streaming response.")
       context = json["context"]
-      # TODO: Figure out what cache key should be for context
       Rails.cache.write("context", context)
       message = build_markdown_updater(rand)
       broadcast_message(rand, message)
