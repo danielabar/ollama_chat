@@ -4,6 +4,8 @@ Rails project from following along with [Streaming LLM Responses ▶️](https:/
 
 ## Differences in this project from tutorial
 
+### JavaScript and CSS Handling
+
 Original tutorial uses [esbuild](https://github.com/rails/jsbundling-rails) for JavaScript and [Bootstrap](https://getbootstrap.com/) for styles. This project uses [importmaps](https://github.com/rails/importmap-rails) for JavaScript and [TailwindCSS](https://tailwindcss.com/docs/installation) for styles.
 
 Since `ChatJob` generates an html string for the message chunks, need to configure this as a content source for Tailwind, otherwise, the referenced Tailwind classes will not get included in the Tailwind build/generated css:
@@ -48,6 +50,14 @@ Also need CSS for highlight.js theme, added to `app/views/layouts/application.ht
 <head>
   <link rel="stylesheet" href="https://cdn.jsdelivr.net/gh/highlightjs/cdn-release@11.9.0/build/styles/github-dark.min.css">
 </head>
+```
+
+### Encoding
+
+Was getting encoding errors from some response chunks from model, fix by specifying UTF-8 encoding:
+
+```ruby
+json = JSON.parse(chunk.force_encoding("UTF-8"))
 ```
 
 ## Project Setup
