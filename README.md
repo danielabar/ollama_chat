@@ -57,20 +57,38 @@ Install:
 * [Docker](https://docs.docker.com/get-docker/)
 * [Ollama](https://github.com/ollama/ollama)
 
-```bash
-# In one terminal (db unused for now but could be for future)
-docker-compose up
+In one terminal (db unused for now but could be for future)
 
-# In another terminal
+```bash
+docker-compose up
+```
+
+In another terminal:
+
+```bash
+# Fetch the LLM (Ref: https://ollama.com/library)
 ollama pull mistral:latest
+
+# Install projects dependencies and setup database
 bin/setup
+
+# Enable dev caching (required for context)
+bin/rails dev:cache
+
+# Start Rails server and TailwindCSS build in watch mode
 bin/dev
 ```
 
 Navigate to `http://localhost:3000`
 
-## Nice to Have
+Type in your message/question in the text area and click Send.
 
+## Future Features
+
+* Maybe related to marked plugin:
+  * it removes line breaks, numbered and bullet lists, maybe need to explicitly style these somewhere
+  * Also see advanced options: https://marked.js.org/using_advanced#options
+  * Maybe need tailwind apply something like this but not exactly: https://dev.to/ewatch/styling-markdown-generated-html-with-tailwind-css-and-parsedown-328d
 * Model URI should be config/env var rather than hard-coded
 * Allow user to select from list of available models (how to handle if prompt format is different for each?)
 * Also broadcast the question in a different styled div so it looks like a Q & A conversation
@@ -80,6 +98,10 @@ Navigate to `http://localhost:3000`
 * Would the ChatJob http code be easier to read with Faraday? It does support [streaming responses](https://lostisland.github.io/faraday/#/adapters/custom/streaming)
 * Mixing of logic and presentation concerns in `ChatJob#message_div` - could this be pulled out into a stream erb response that accepts the rand hex number as a local?
 * Is Redis needed for ActionCable re: `Turbo::StreamsChannel.broadcast_append_to "welcome", target:, html: message` in `ChatJob`?
-* If there are multiple clients (eg: open several browsers/tabs), it broadcasts to *all* of them - use signed stream and detect signed in user? See https://www.hotrails.dev/turbo-rails/turbo-streams-security
+* If there are multiple clients (eg: open several browsers/tabs), it broadcasts to *all* of them
+  * Use signed stream and detect signed in user? See https://www.hotrails.dev/turbo-rails/turbo-streams-security
+  * This may require adding user sign in, devise (or can it just use a simple session id if want to allow anon usage?)
+  * Will need "smarter" cache key for context per user, per chat
 * If using a strict form of CSP, the injected inline script from ChatJob might get rejected?
-* Context? See Ollama REST API: https://github.com/ollama/ollama/blob/main/docs/api.md
+* Why isn't code indented? Should the indents be coming from model response or is this considered client side formatting?
+* Cancel response? (model could get stuck in a loop...)

@@ -9,11 +9,13 @@ class ChatJob < ApplicationJob
     # Setting stream to true means as we start inference on model,
     # will send back a bunch of chunks
     # Note that prompt from user must be formatted before we can pass it to the model
+    cached_context = Rails.cache.read("context")
     uri = URI("http://localhost:11434/api/generate")
     request = Net::HTTP::Post.new(uri, "Content-Type" => "application/json")
     request.body = {
       model: "mistral:latest",
       prompt: context(prompt),
+      context: cached_context,
       temperature: 1,
       stream: true
     }.to_json
@@ -30,7 +32,7 @@ class ChatJob < ApplicationJob
           # chunks are json, eg:
           # {"model":"mistral:latest","created_at":"2024-03-18T12:48:19.494759Z","response":" need","done":false}
           # When done is true, we get an empty response
-          Rails.logger.info("✅ #{chunk}")
+          Rails.logger.info("✅ #{chunk.force_encoding('UTF-8')}")
           process_chunk(chunk, rand)
         end
       end
@@ -61,13 +63,15 @@ class ChatJob < ApplicationJob
     Turbo::StreamsChannel.broadcast_append_to "welcome", target:, html: message
   end
 
-  # If response attribute is an empty string, generate html line break
   def process_chunk(chunk, rand)
-    json = JSON.parse(chunk)
+    json = JSON.parse(chunk.force_encoding("UTF-8"))
     done = json["done"]
+    # If response attribute is an empty string, generate html line break
     message = json["response"].to_s.strip.empty? ? "<br/>" : json["response"]
     if done
       Rails.logger.info("🎉 Done streaming response.")
+      context = json["context"]
+      Rails.cache.write("context", context)
       message = build_markdown_updater(rand)
       broadcast_message(rand, message)
     else
