@@ -95,23 +95,32 @@ Type in your message/question in the text area and click Send.
 
 ## Future Features
 
+* WIP: If there are multiple clients (eg: open several browsers/tabs), it broadcasts to *all* of them
+  * Verify by checking `/cable` WS request in dev tools, command/subscribe - signed_stream_name (see if its the same for all)
+  * Find which gem `broadcast_append_to` is a part of, its not in official rails docs?
+  * Use signed stream and detect signed in user? See https://www.hotrails.dev/turbo-rails/turbo-streams-security
+  * This may require adding user sign in, devise (or can it just use a simple session id if want to allow anon usage?)
+  * Will need "smarter" cache key for context per user, per chat
+  * Consider `session[:session_id]` OR some other kind of unique ID such as `session[:chat_id]`, generating a unique chat id at first POST of chat controller
+
+* ChatJob Refactor
+  * Extract interaction with Ollama REST API to `OllamaClient`, something like this: https://github.com/danielabar/echo-weather-rails/blob/main/lib/weather/client.rb
+  * Would the ChatJob http code be easier to read with Faraday? It does support [streaming responses](https://lostisland.github.io/faraday/#/adapters/custom/streaming)
+  * Model URI should be config/env var rather than hard-coded
+  * Mixing of logic and presentation concerns in `ChatJob#message_div` - could this be pulled out into a stream erb response that accepts the rand hex number as a local?
+  * Is Redis needed for ActionCable re: `Turbo::StreamsChannel.broadcast_append_to "welcome", target:, html: message` in `ChatJob`?
+  * If using a strict form of CSP, the injected inline script from ChatJob might get rejected?
+
 * Maybe related to marked plugin:
   * it removes line breaks, numbered and bullet lists, maybe need to explicitly style these somewhere
   * Also see advanced options: https://marked.js.org/using_advanced#options
   * Maybe need tailwind apply something like this but not exactly: https://dev.to/ewatch/styling-markdown-generated-html-with-tailwind-css-and-parsedown-328d
-* Model URI should be config/env var rather than hard-coded
-* Allow user to select from list of available models (how to handle if prompt format is different for each?)
+  * Why aren't code responses from model indented? Should the indents be coming from model response or is this considered client side formatting?
+
 * Also broadcast the question in a different styled div so it looks like a Q & A conversation
+* Allow user to select from list of available models (how to handle if prompt format is different for each?)
 * Save chat history
 * Ability to start a new chat
 * Run the same prompt against 2 or more models at the same time for comparison
-* Would the ChatJob http code be easier to read with Faraday? It does support [streaming responses](https://lostisland.github.io/faraday/#/adapters/custom/streaming)
-* Mixing of logic and presentation concerns in `ChatJob#message_div` - could this be pulled out into a stream erb response that accepts the rand hex number as a local?
-* Is Redis needed for ActionCable re: `Turbo::StreamsChannel.broadcast_append_to "welcome", target:, html: message` in `ChatJob`?
-* If there are multiple clients (eg: open several browsers/tabs), it broadcasts to *all* of them
-  * Use signed stream and detect signed in user? See https://www.hotrails.dev/turbo-rails/turbo-streams-security
-  * This may require adding user sign in, devise (or can it just use a simple session id if want to allow anon usage?)
-  * Will need "smarter" cache key for context per user, per chat
-* If using a strict form of CSP, the injected inline script from ChatJob might get rejected?
-* Why isn't code indented? Should the indents be coming from model response or is this considered client side formatting?
 * Cancel response? (model could get stuck in a loop...)
+* Auto scroll as conversation exceeds length of viewport
