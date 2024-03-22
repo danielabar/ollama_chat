@@ -2,13 +2,12 @@
   <h1>Welcome#index</h1>
 
   <%# Subscribe to welcome channel for real-time updates via ActionCable %>
-  <%# TODO: Somehow get session_id or some other unique id in here for signed stream per session rather than ALL users %>
-  <%# Something like this: turbo_stream_from current_company, "quotes" %>
-  <%= turbo_stream_from session[:session_id], "welcome" %>
+  <%# Use chat_id so that each connected client will have a unique chat session %>
+  <%= turbo_stream_from @chat_id, "welcome" %>
 
   <%# Here is where we will stream the responses from the llm %>
   <div id="messages"></div>
 
   <%# The user types in their prompt here %>
-  <%= render "form" %>
+  <%= render "form", chat_id: @chat_id %>
 </div>

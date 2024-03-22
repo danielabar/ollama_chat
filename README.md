@@ -1,3 +1,18 @@
+<!-- START doctoc generated TOC please keep comment here to allow auto update -->
+<!-- DON'T EDIT THIS SECTION, INSTEAD RE-RUN doctoc TO UPDATE -->
+**Table of Contents**  *generated with [DocToc](https://github.com/thlorenz/doctoc)*
+
+- [Ollama Chat Rails](#ollama-chat-rails)
+  - [Differences in this project from tutorial](#differences-in-this-project-from-tutorial)
+    - [JavaScript and CSS Handling](#javascript-and-css-handling)
+    - [Encoding](#encoding)
+    - [Context](#context)
+    - [Separate Sessions](#separate-sessions)
+  - [Project Setup](#project-setup)
+  - [Future Features](#future-features)
+
+<!-- END doctoc generated TOC please keep comment here to allow auto update -->
+
 # Ollama Chat Rails
 
 Rails project from following along with [Streaming LLM Responses ▶️](https://youtu.be/hSxmEZjCPP8?si=ps__eK0MbuSDFPXw) for building a streaming AI chatbot with Rails and Ollama.
@@ -58,6 +73,154 @@ Was getting encoding errors from some response chunks from model, fix by specify
 
 ```ruby
 json = JSON.parse(chunk.force_encoding("UTF-8"))
+```
+
+### Context
+
+The original tutorial does not include context for conversational history. To have the model remember the past conversations you've been having with it, need to save the `context` from the Ollama [REST API](https://github.com/ollama/ollama/blob/main/docs/api.md) response (for eg: in Rails cache), then include this context in the next Ollama REST API request.
+
+For example:
+
+```ruby
+# When making a request
+cache_key = "context_#{chat_id}"
+cached_context = Rails.cache.read(cache_key)
+
+uri = URI("http://localhost:11434/api/generate")
+request = Net::HTTP::Post.new(uri, "Content-Type" => "application/json")
+request.body = {
+  model: "mistral:latest",
+  prompt: context(prompt),
+  context: cached_context,
+  temperature: 1,
+  stream: true
+}.to_json
+
+# Later when received response with done: true
+Net::HTTP.start(uri.hostname, uri.port) do |http|
+  http.request(request) do |response|
+    response.read_body do |chunk|
+      # chunks are json, eg:
+      # {"model":"mistral:latest","created_at":"2024-03-18T12:48:19.494759Z","response":" need","done":false}
+      # When done is true, we get an empty response, but with `context` populated
+      Rails.logger.info("✅ #{chunk.force_encoding('UTF-8')}")
+      process_chunk(chunk, rand, chat_id)
+    end
+  end
+end
+
+def process_chunk(chunk, rand, chat_id)
+  json = JSON.parse(chunk.force_encoding("UTF-8"))
+  done = json["done"]
+  if done
+    Rails.logger.info("🎉 Done streaming response for chat_id #{chat_id}.")
+
+    # cache context for next inference
+    context = json["context"]
+    cache_key = "context_#{chat_id}"
+    Rails.cache.write(cache_key, context)
+    # ...
+end
+```
+
+### Separate Sessions
+
+With the original tutorial, every connected client subscribes to the same `"welcome"` stream in the welcome index view:
+
+```erb
+<%# app/views/welcome/index.html.erb %>
+<%= turbo_stream_from "welcome" %>
+```
+
+This means if you open multiple browsers (and/or incognito sessions) at `http://localhost:3000`, and type in a question into *any* of them, the model response will be broadcast to *all* browser windows.
+
+To fix this so that each "user", or connected client can have their own unique stream, we need to assign a unique identifier to each chat session. Start in the `WelcomeController` by creating a unique `chat_id` instance variable:
+
+```ruby
+# app/controllers/welcome_controller.rb
+class WelcomeController < ApplicationController
+  def index
+    @chat_id = SecureRandom.hex(20)
+    Rails.logger.info("🗞️ Generated chat id: #{@chat_id}")
+  end
+end
+```
+
+Then in the index view, pass the `chat_id` to the `turbo_stream_from` helper. This will ensure a unique `signed_stream_name` is generated. Also, pass the `chat_id` as a local variable to the form partial:
+
+```erb
+<!-- app/views/welcome/index.html.erb -->
+<div class="w-full">
+  <h1>Welcome#index</h1>
+
+  <%# Subscribe to welcome channel for real-time updates via ActionCable %>
+  <%# Use chat_id so that each connected client will have a unique chat session %>
+  <%= turbo_stream_from @chat_id, "welcome" %>
+
+  <%# Here is where we will stream the responses from the llm %>
+  <div id="messages"></div>
+
+  <%# The user types in their prompt here %>
+  <%= render "form", chat_id: @chat_id %>
+</div>
+```
+
+Update the form partial so that the chat_id gets submitted in the POST as a hidden field:
+
+```erb
+<!-- app/views/welcome/_form.html.erb -->
+<%= form_with url: chats_path, html: { id: "chat_form" } do |f| %>
+  <%= f.hidden_field :chat_id, value: chat_id %>
+  <div>
+    <div>
+      <%= f.text_area :message, placeholder: "Your message", autofocus: true %>
+    </div>
+    <div>
+      <%= f.submit "Send" %>
+    </div>
+  </div>
+<% end %>
+```
+
+Update the `ChatController` that handles this form POST to pass on the `chat_id` to the `ChatJob`, and also to pass `chat_id` back to the form as a local because it renders a turbo stream response to clear out the form (without refreshing the page, hurray for Turbo!):
+
+```ruby
+# app/controllers/chats_controller.rb
+class ChatsController < ApplicationController
+  def create
+    # Interaction with LLM can be slow - execute in the background
+    ChatJob.perform_later(params[:message], params[:chat_id])
+
+    # In the meantime, clear out the form text area that user just typed
+    # render turbo_stream: turbo_stream.replace("chat_form", partial: "welcome/form")
+    render turbo_stream: turbo_stream.replace("chat_form", partial: "welcome/form",
+                                                           locals: { chat_id: params[:chat_id] })
+  end
+end
+```
+
+Then use `chat_id` in `ChatJob` to distinguish the `context` cache key (as shown earlier in the context section of this document).
+
+Also, use `chat_id` when broadcasting the model response so that it will go to the correct stream. Notice if you pass an array as the first argument to `broadcast_append_to`, it generates a signed stream name from all the array elements:
+
+```ruby
+# app/jobs/chat_job.rb
+class ChatJob < ApplicationJob
+  queue_as :default
+
+  def perform(prompt, chat_id)
+    # ...
+  end
+
+  # ...
+
+  def broadcast_message(target, message, chat_id)
+    # This uses ActionCable to broadcast the html message to the welcome channel.
+    # Any view that has subscribed to this channel `turbo_stream_from "welcome"`
+    # and the given chat_id will receive the message.
+    Turbo::StreamsChannel.broadcast_append_to [chat_id, "welcome"], target:, html: message
+  end
+end
 ```
 
 ## Project Setup

@@ -1,4 +1,5 @@
 <%= form_with url: chats_path, html: { id: "chat_form", class: "mt-3" } do |f| %>
+  <%= f.hidden_field :chat_id, value: chat_id %>
   <div class="flex">
     <div class="w-11/12">
       <%= f.text_area :message, class: "resize-none border rounded-md w-full py-2 px-3 text-gray-700 placeholder-gray-400 focus:outline-none focus:border-blue-500", placeholder: "Your message", autofocus: true %>
