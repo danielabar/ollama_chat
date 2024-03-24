@@ -29,8 +29,9 @@ module Ollama
       Net::HTTP.start(@uri.hostname, @uri.port) do |http|
         http.request(request) do |response|
           response.read_body do |chunk|
-            Rails.logger.info("✅ #{chunk.force_encoding('UTF-8')}")
-            yield chunk if block_given?
+            encoded_chunk = chunk.force_encoding("UTF-8")
+            Rails.logger.info("✅ #{encoded_chunk}")
+            yield encoded_chunk if block_given?
           end
         end
       end

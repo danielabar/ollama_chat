@@ -8,6 +8,7 @@
     - [Encoding](#encoding)
     - [Context](#context)
     - [Separate Sessions](#separate-sessions)
+    - [Split up ChatJob Responsibilities](#split-up-chatjob-responsibilities)
   - [Project Setup](#project-setup)
   - [Future Features](#future-features)
   - [Deployment](#deployment)
@@ -232,6 +233,12 @@ class ChatJob < ApplicationJob
 end
 ```
 
+### Split up ChatJob Responsibilities
+
+In the original tutorial, the ChatJob is also responsible for all the stream http request/response with the Ollama REST API.
+
+In this project, that responsibility has been split out to `Ollama::Client` to handle the request, and stream the response back to the client by yielding to a given block.
+
 ## Project Setup
 
 Install:
@@ -280,13 +287,15 @@ Type in your message/question in the text area and click Send.
   * Maybe need tailwind apply something like this but not exactly: https://dev.to/ewatch/styling-markdown-generated-html-with-tailwind-css-and-parsedown-328d
   * Why aren't code responses from model indented? Should the indents be coming from model response or is this considered client side formatting?
 
-* Also broadcast the question in a different styled div so it looks like a Q & A conversation
+* Broadcast the question in a different styled div so it looks like a Q & A conversation
 * Allow user to select from list of available models (how to handle if prompt format is different for each?)
 * Save chat history
 * Ability to start a new chat
 * Run the same prompt against 2 or more models at the same time for comparison
 * Cancel response? (model could get stuck in a loop...)
+
 * Auto scroll as conversation exceeds length of viewport
+  * Probably a StimulusJS controller with somewhere this logic: `window.scrollTo(0, document.documentElement.scrollHeight);`
 
 ## Deployment
 

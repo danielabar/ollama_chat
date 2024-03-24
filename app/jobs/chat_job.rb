@@ -32,15 +32,15 @@ class ChatJob < ApplicationJob
   end
 
   # Find DOM element with `id` of `target` and append message (which is some html content) to it.
+  # Uses ActionCable to broadcast the html message to the welcome channel.
+  # Any view that has subscribed to this channel `turbo_stream_from @chat_id, "welcome"`
+  # will receive the message.
   def broadcast_message(target, message, chat_id)
-    # This uses ActionCable to broadcast the html message to the welcome channel.
-    # Any view that has subscribed to this channel `turbo_stream_from @chat_id, "welcome"`
-    # will receive the message.
     Turbo::StreamsChannel.broadcast_append_to [chat_id, "welcome"], target:, html: message
   end
 
   def process_chunk(chunk, rand, chat_id)
-    json = JSON.parse(chunk.force_encoding("UTF-8"))
+    json = JSON.parse(chunk)
     done = json["done"]
     # If response attribute is an empty string, generate html line break
     message = json["response"].to_s.strip.empty? ? "<br/>" : json["response"]
