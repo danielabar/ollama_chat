@@ -3,41 +3,14 @@ require "net/http"
 class ChatJob < ApplicationJob
   queue_as :default
 
-  # prompt is passed in from the form text area that user typed in
   def perform(prompt, chat_id)
-    # Setup http request to Ollama
-    # Setting stream to true means as we start inference on model,
-    # will send back a bunch of chunks
-    # Note that prompt from user must be formatted before we can pass it to the model
-    cache_key = "context_#{chat_id}"
-    cached_context = Rails.cache.read(cache_key)
+    cached_context = Rails.cache.read("context_#{chat_id}")
+    client = Ollama::Client.new
+    rand = SecureRandom.hex(10)
+    broadcast_message("messages", message_div(rand), chat_id)
 
-    uri = URI("http://localhost:11434/api/generate")
-    request = Net::HTTP::Post.new(uri, "Content-Type" => "application/json")
-    request.body = {
-      model: "mistral:latest",
-      prompt: context(prompt),
-      context: cached_context,
-      temperature: 1,
-      stream: true
-    }.to_json
-
-    # Now make the http request
-    # Need rand number assigned to each frame
-    # "messages" is the id of a div in the welcome index view
-    Net::HTTP.start(uri.hostname, uri.port) do |http|
-      rand = SecureRandom.hex(10)
-      # broadcast initial empty message
-      broadcast_message("messages", message_div(rand), chat_id)
-      http.request(request) do |response|
-        response.read_body do |chunk|
-          # chunks are json, eg:
-          # {"model":"mistral:latest","created_at":"2024-03-18T12:48:19.494759Z","response":" need","done":false}
-          # When done is true, we get an empty response
-          Rails.logger.info("✅ #{chunk.force_encoding('UTF-8')}")
-          process_chunk(chunk, rand, chat_id)
-        end
-      end
+    client.request(prompt, cached_context) do |chunk|
+      process_chunk(chunk, rand, chat_id)
     end
   end
 
