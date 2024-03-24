@@ -4,12 +4,14 @@ class ChatJob < ApplicationJob
   queue_as :default
 
   # prompt is passed in from the form text area that user typed in
-  def perform(prompt)
+  def perform(prompt, chat_id)
     # Setup http request to Ollama
     # Setting stream to true means as we start inference on model,
     # will send back a bunch of chunks
     # Note that prompt from user must be formatted before we can pass it to the model
-    cached_context = Rails.cache.read("context")
+    cache_key = "context_#{chat_id}"
+    cached_context = Rails.cache.read(cache_key)
+
     uri = URI("http://localhost:11434/api/generate")
     request = Net::HTTP::Post.new(uri, "Content-Type" => "application/json")
     request.body = {
@@ -26,14 +28,14 @@ class ChatJob < ApplicationJob
     Net::HTTP.start(uri.hostname, uri.port) do |http|
       rand = SecureRandom.hex(10)
       # broadcast initial empty message
-      broadcast_message("messages", message_div(rand))
+      broadcast_message("messages", message_div(rand), chat_id)
       http.request(request) do |response|
         response.read_body do |chunk|
           # chunks are json, eg:
           # {"model":"mistral:latest","created_at":"2024-03-18T12:48:19.494759Z","response":" need","done":false}
           # When done is true, we get an empty response
           Rails.logger.info("✅ #{chunk.force_encoding('UTF-8')}")
-          process_chunk(chunk, rand)
+          process_chunk(chunk, rand, chat_id)
         end
       end
     end
@@ -57,25 +59,30 @@ class ChatJob < ApplicationJob
   end
 
   # Find DOM element with `id` of `target` and append message (which is some html content) to it.
-  def broadcast_message(target, message)
-    # This uses ActionCable to broadcast the html message to the welcome channel
-    # Any view that has subscribed to this channel `turbo_stream_from "welcome"` will receive the message
-    Turbo::StreamsChannel.broadcast_append_to "welcome", target:, html: message
+  def broadcast_message(target, message, chat_id)
+    # This uses ActionCable to broadcast the html message to the welcome channel.
+    # Any view that has subscribed to this channel `turbo_stream_from @chat_id, "welcome"`
+    # will receive the message.
+    Turbo::StreamsChannel.broadcast_append_to [chat_id, "welcome"], target:, html: message
   end
 
-  def process_chunk(chunk, rand)
+  def process_chunk(chunk, rand, chat_id)
     json = JSON.parse(chunk.force_encoding("UTF-8"))
     done = json["done"]
     # If response attribute is an empty string, generate html line break
     message = json["response"].to_s.strip.empty? ? "<br/>" : json["response"]
     if done
-      Rails.logger.info("🎉 Done streaming response.")
+      Rails.logger.info("🎉 Done streaming response for chat_id #{chat_id}.")
+
+      # cache context for next inference
       context = json["context"]
-      Rails.cache.write("context", context)
+      cache_key = "context_#{chat_id}"
+      Rails.cache.write(cache_key, context)
+
       message = build_markdown_updater(rand)
-      broadcast_message(rand, message)
+      broadcast_message(rand, message, chat_id)
     else
-      broadcast_message(rand, message)
+      broadcast_message(rand, message, chat_id)
     end
   end
 

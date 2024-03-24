@@ -1,12 +1,13 @@
 <div class="w-full">
   <h1>Welcome#index</h1>
 
-  <%# ubscribe to welcome channel for real-time updates via ActionCable %>
-  <%= turbo_stream_from "welcome" %>
+  <%# Subscribe to welcome channel for real-time updates via ActionCable %>
+  <%# Use chat_id so that each connected client will have a unique chat session %>
+  <%= turbo_stream_from @chat_id, "welcome" %>
 
   <%# Here is where we will stream the responses from the llm %>
   <div id="messages"></div>
 
   <%# The user types in their prompt here %>
-  <%= render "form" %>
+  <%= render "form", chat_id: @chat_id %>
 </div>
