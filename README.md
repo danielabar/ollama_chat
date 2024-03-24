@@ -275,9 +275,6 @@ Type in your message/question in the text area and click Send.
 ## Future Features
 
 * WIP ChatJob Refactor
-  * Extract interaction with Ollama REST API to `OllamaClient`, something like this: https://github.com/danielabar/echo-weather-rails/blob/main/lib/weather/client.rb
-  * Would the ChatJob http code be easier to read with Faraday? It does support [streaming responses](https://lostisland.github.io/faraday/#/adapters/custom/streaming)
-  * Model URI should be config/env var rather than hard-coded
   * Mixing of logic and presentation concerns in `ChatJob#message_div` - could this be pulled out into a stream erb response that accepts the rand hex number as a local?
   * If using a strict form of CSP, the injected inline script from ChatJob might get rejected?
 
@@ -295,7 +292,7 @@ Type in your message/question in the text area and click Send.
 * Cancel response? (model could get stuck in a loop...)
 
 * Auto scroll as conversation exceeds length of viewport
-  * Probably a StimulusJS controller with somewhere this logic: `window.scrollTo(0, document.documentElement.scrollHeight);`
+  * Probably a StimulusJS controller with somewhere this logic: `window.scrollTo(0, document.documentElement.scrollHeight);
 
 ## Deployment
 

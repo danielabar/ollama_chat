@@ -1,0 +1,13 @@
+default: &default
+  chat_api_url: <%= ENV.fetch("CHAT_API_URL") { "http://localhost:11434/api/generate" } %>
+  chat_model: <%= ENV.fetch("CHAT_MODEL") { "mistral:latest" } %>
+
+development:
+  <<: *default
+
+test:
+  <<: *default
+
+production:
+  chat_api_url: <%= ENV["CHAT_API_URL"] %>
+  chat_model: <%= ENV["CHAT_MODEL"] %>

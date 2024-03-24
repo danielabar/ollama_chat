@@ -1,5 +1,7 @@
 <div class="w-full">
-  <h1>Welcome#index</h1>
+  <span class="bg-yellow-200 border-yellow-400 text-yellow-700 px-4 py-2 mb-4 rounded-full inline-block">
+    Using model: <%= Rails.application.config.chat["chat_model"] %>
+  </span>
 
   <%# Subscribe to welcome channel for real-time updates via ActionCable %>
   <%# Use chat_id so that each connected client will have a unique chat session %>

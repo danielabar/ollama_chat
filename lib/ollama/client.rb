@@ -2,8 +2,9 @@ require "net/http"
 
 module Ollama
   class Client
-    def initialize
-      @uri = URI("http://localhost:11434/api/generate")
+    def initialize(model = nil)
+      @uri = URI(Rails.application.config.chat["chat_api_url"])
+      @model = model || Rails.application.config.chat["chat_model"]
     end
 
     def request(prompt, cached_context, &)
@@ -16,7 +17,7 @@ module Ollama
     def build_request(prompt, cached_context)
       request = Net::HTTP::Post.new(@uri, "Content-Type" => "application/json")
       request.body = {
-        model: "mistral:latest",
+        model: @model,
         prompt: context(prompt),
         context: cached_context,
         temperature: 1,
