@@ -9,6 +9,7 @@
     - [Context](#context)
     - [Separate Sessions](#separate-sessions)
     - [Split up ChatJob Responsibilities](#split-up-chatjob-responsibilities)
+    - [Configurable model and API endpoint](#configurable-model-and-api-endpoint)
   - [Project Setup](#project-setup)
   - [Future Features](#future-features)
   - [Deployment](#deployment)
@@ -237,6 +238,66 @@ end
 In the original tutorial, the ChatJob is also responsible for all the stream http request/response with the Ollama REST API.
 
 In this project, that responsibility has been split out to `Ollama::Client` to handle the request, and stream the response back to the client by yielding to a given block.
+
+### Configurable model and API endpoint
+
+In the original tutorial, the model `mistral:latest` and API url `http://localhost:11434/api/generate` are hard-coded in the `ChatJob`. In this version, they're set as environment variables, for example in `.env`:
+
+```bash
+CHAT_API_URL=http://localhost:11434/api/generate
+
+# See other values at: https://ollama.com/library
+CHAT_MODEL=mistral:latest
+```
+
+These are read from a new configuration file:
+
+```yml
+# config/chat.yml
+default: &default
+  chat_api_url: <%= ENV.fetch("CHAT_API_URL") { "http://localhost:11434/api/generate" } %>
+  chat_model: <%= ENV.fetch("CHAT_MODEL") { "mistral:latest" } %>
+
+development:
+  <<: *default
+
+test:
+  <<: *default
+
+production:
+  chat_api_url: <%= ENV["CHAT_API_URL"] %>
+  chat_model: <%= ENV["CHAT_MODEL"] %>
+```
+
+This config is loaded in the application:
+
+```ruby
+# config/application.rb
+module OllamaChat
+  class Application < Rails::Application
+    # ...
+
+    # Load custom config
+    config.chat = config_for(:chat)
+  end
+end
+```
+
+Then it can be used by `Ollama::Client`:
+
+```ruby
+# lib/ollama/client.rb
+module Ollama
+  class Client
+    def initialize(model = nil)
+      @uri = URI(Rails.application.config.chat["chat_api_url"])
+      @model = model || Rails.application.config.chat["chat_model"]
+    end
+
+    # ...
+  end
+end
+```
 
 ## Project Setup
 
