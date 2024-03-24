@@ -61,8 +61,8 @@ class ChatJob < ApplicationJob
   # Find DOM element with `id` of `target` and append message (which is some html content) to it.
   def broadcast_message(target, message, chat_id)
     # This uses ActionCable to broadcast the html message to the welcome channel.
-    # Any view that has subscribed to this channel `turbo_stream_from "welcome"`
-    # and the given chat_id will receive the message.
+    # Any view that has subscribed to this channel `turbo_stream_from @chat_id, "welcome"`
+    # will receive the message.
     Turbo::StreamsChannel.broadcast_append_to [chat_id, "welcome"], target:, html: message
   end
 

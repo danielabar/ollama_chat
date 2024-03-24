@@ -10,12 +10,19 @@
     - [Separate Sessions](#separate-sessions)
   - [Project Setup](#project-setup)
   - [Future Features](#future-features)
+  - [Deployment](#deployment)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
 # Ollama Chat Rails
 
-Rails project from following along with [Streaming LLM Responses ▶️](https://youtu.be/hSxmEZjCPP8?si=ps__eK0MbuSDFPXw) for building a streaming AI chatbot with Rails and Ollama.
+Rails project from following along with [Streaming LLM Responses  ▶️](https://youtu.be/hSxmEZjCPP8?si=ps__eK0MbuSDFPXw) for building a streaming AI chatbot with Rails and Ollama.
+
+This project uses Hotwire for SPA like interactivity features including:
+
+* [Turbo Streams](https://github.com/hotwired/turbo-rails?tab=readme-ov-file#come-alive-with-turbo-streams) over websockets (via ActionCable) to stream the response from the LLM to the UI.
+* Turbo Stream as regular HTTP response to clear our the chat form without requiring a full page refresh
+* [Stimulus](https://github.com/hotwired/stimulus) for some lightweight JS to augment the model responses by converting to markdown and syntax highlighting code blocks (together with the marked and highlight.js libraries).
 
 ## Differences in this project from tutorial
 
@@ -132,6 +139,8 @@ With the original tutorial, every connected client subscribes to the same `"welc
 <%= turbo_stream_from "welcome" %>
 ```
 
+Check dev tools -> Network -> WS -> `/cable` -> Messages -> Filter: `signed_stream_name`
+
 This means if you open multiple browsers (and/or incognito sessions) at `http://localhost:3000`, and type in a question into *any* of them, the model response will be broadcast to *all* browser windows.
 
 To fix this so that each "user", or connected client can have their own unique stream, we need to assign a unique identifier to each chat session. Start in the `WelcomeController` by creating a unique `chat_id` instance variable:
@@ -192,7 +201,6 @@ class ChatsController < ApplicationController
     ChatJob.perform_later(params[:message], params[:chat_id])
 
     # In the meantime, clear out the form text area that user just typed
-    # render turbo_stream: turbo_stream.replace("chat_form", partial: "welcome/form")
     render turbo_stream: turbo_stream.replace("chat_form", partial: "welcome/form",
                                                            locals: { chat_id: params[:chat_id] })
   end
@@ -216,8 +224,8 @@ class ChatJob < ApplicationJob
 
   def broadcast_message(target, message, chat_id)
     # This uses ActionCable to broadcast the html message to the welcome channel.
-    # Any view that has subscribed to this channel `turbo_stream_from "welcome"`
-    # and the given chat_id will receive the message.
+    # Any view that has subscribed to this channel `turbo_stream_from @chat_id, "welcome"`
+    # will receive the message.
     Turbo::StreamsChannel.broadcast_append_to [chat_id, "welcome"], target:, html: message
   end
 end
@@ -258,20 +266,13 @@ Type in your message/question in the text area and click Send.
 
 ## Future Features
 
-* WIP: If there are multiple clients (eg: open several browsers/tabs), it broadcasts to *all* of them
-  * Verify by checking `/cable` WS request in dev tools, command/subscribe - signed_stream_name (see if its the same for all)
-  * Find which gem `broadcast_append_to` is a part of, its not in official rails docs?
-  * Use signed stream and detect signed in user? See https://www.hotrails.dev/turbo-rails/turbo-streams-security
-  * This may require adding user sign in, devise (or can it just use a simple session id if want to allow anon usage?)
-  * Will need "smarter" cache key for context per user, per chat
-  * Consider `session[:session_id]` OR some other kind of unique ID such as `session[:chat_id]`, generating a unique chat id at first POST of chat controller
-
 * ChatJob Refactor
   * Extract interaction with Ollama REST API to `OllamaClient`, something like this: https://github.com/danielabar/echo-weather-rails/blob/main/lib/weather/client.rb
   * Would the ChatJob http code be easier to read with Faraday? It does support [streaming responses](https://lostisland.github.io/faraday/#/adapters/custom/streaming)
   * Model URI should be config/env var rather than hard-coded
   * Mixing of logic and presentation concerns in `ChatJob#message_div` - could this be pulled out into a stream erb response that accepts the rand hex number as a local?
   * Is Redis needed for ActionCable re: `Turbo::StreamsChannel.broadcast_append_to "welcome", target:, html: message` in `ChatJob`?
+    * Yes in production, see `config/cable.yml`
   * If using a strict form of CSP, the injected inline script from ChatJob might get rejected?
 
 * Maybe related to marked plugin:
@@ -287,3 +288,12 @@ Type in your message/question in the text area and click Send.
 * Run the same prompt against 2 or more models at the same time for comparison
 * Cancel response? (model could get stuck in a loop...)
 * Auto scroll as conversation exceeds length of viewport
+
+## Deployment
+
+For the tutorial, this only runs locally on a laptop. What would it take to deploy this?
+
+* Ollama server running/deployed somewhere accessible to Puma/Rails - auth???
+* Sidekiq or some other production quality [backend for ActiveJob](https://guides.rubyonrails.org/active_job_basics.html#backends)
+* Redis configured with persistent storage if using Sidekiq as ActiveJob queue adapter
+* Redis configured for ActionCable, see `config/cable.yml` (possibly a different Redis instance than that used for Sidekiq/ActiveJob?)
