@@ -7,7 +7,7 @@ class ChatJob < ApplicationJob
     cached_context = Rails.cache.read("context_#{chat_id}")
     client = Ollama::Client.new
     rand = SecureRandom.hex(10)
-    broadcast_message("messages", message_div(rand), chat_id)
+    broadcast_response_container("messages", rand, chat_id)
 
     client.request(prompt, cached_context) do |chunk|
       process_chunk(chunk, rand, chat_id)
@@ -16,27 +16,9 @@ class ChatJob < ApplicationJob
 
   private
 
-  def context(prompt)
-    "[INST]#{prompt}[/INST]"
-  end
-
-  # Use heredoc because it supports multi-line html for legibility
-  def message_div(rand)
-    <<~HTML
-      <div id='#{rand}'
-           data-controller='markdown-text'
-           data-markdown-text-updated-value=''
-           class='border border-blue-500 bg-blue-100 text-blue-800 p-2 rounded-xl mb-2'>
-      </div>
-    HTML
-  end
-
-  # Find DOM element with `id` of `target` and append message (which is some html content) to it.
-  # Uses ActionCable to broadcast the html message to the welcome channel.
-  # Any view that has subscribed to this channel `turbo_stream_from @chat_id, "welcome"`
-  # will receive the message.
-  def broadcast_message(target, message, chat_id)
-    Turbo::StreamsChannel.broadcast_append_to [chat_id, "welcome"], target:, html: message
+  def broadcast_response_container(target, rand, chat_id)
+    Turbo::StreamsChannel.broadcast_append_to [chat_id, "welcome"], target:, partial: "chats/response",
+                                                                    locals: { rand: }
   end
 
   def process_chunk(chunk, rand, chat_id)
@@ -57,6 +39,14 @@ class ChatJob < ApplicationJob
     else
       broadcast_message(rand, message, chat_id)
     end
+  end
+
+  # Find DOM element with `id` of `target` and append message (which is some html content) to it.
+  # Uses ActionCable to broadcast the html message.
+  # Any view that has subscribed to this channel `turbo_stream_from @chat_id, "welcome"`
+  # will receive the message.
+  def broadcast_message(target, message, chat_id)
+    Turbo::StreamsChannel.broadcast_append_to [chat_id, "welcome"], target:, html: message
   end
 
   # The stimulus controller will perform some action anytime the markdown-text-update-value is updated

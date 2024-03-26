@@ -8,11 +8,13 @@
     - [Encoding](#encoding)
     - [Context](#context)
     - [Separate Sessions](#separate-sessions)
-    - [Split up ChatJob Responsibilities](#split-up-chatjob-responsibilities)
+    - [Introduce Ollama::Client for Communication with Model](#introduce-ollamaclient-for-communication-with-model)
     - [Configurable model and API endpoint](#configurable-model-and-api-endpoint)
+  - [Extract Turbo Stream Response Partials](#extract-turbo-stream-response-partials)
   - [Project Setup](#project-setup)
   - [Future Features](#future-features)
   - [Deployment](#deployment)
+  - [Temp](#temp)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -233,7 +235,7 @@ class ChatJob < ApplicationJob
 end
 ```
 
-### Split up ChatJob Responsibilities
+### Introduce Ollama::Client for Communication with Model
 
 In the original tutorial, the ChatJob is also responsible for all the stream http request/response with the Ollama REST API.
 
@@ -299,6 +301,29 @@ module Ollama
 end
 ```
 
+## Extract Turbo Stream Response Partials
+
+In the original tutorial, the response message div is broadcast from the ChatJob, which takes on the responsibility of building the html response as a heredoc string. In this version, that's extracted to a view partial `app/views/chats/_response.html.erb` that accepts a local variable `rand`:
+
+```erb
+<div id="<%= rand %>"
+     data-controller='markdown-text'
+     data-markdown-text-updated-value=''
+     class='border border-blue-500 bg-blue-100 text-blue-800 p-2 rounded-xl mb-2'>
+</div>
+```
+
+And here is the modified ChatJob method that broadcasts the partial, specifying the value for the `rand` local variable:
+
+```ruby
+def broadcast_response_container(target, rand, chat_id)
+  Turbo::StreamsChannel.broadcast_append_to [chat_id, "welcome"], target:, partial: "chats/response",
+                                                                  locals: { rand: }
+end
+```
+
+The idea is to avoid presentational concerns in the business logic.
+
 ## Project Setup
 
 Install:
@@ -362,3 +387,35 @@ For the tutorial, this only runs locally on a laptop. What would it take to depl
 * Sidekiq or some other production quality [backend for ActiveJob](https://guides.rubyonrails.org/active_job_basics.html#backends)
 * Redis configured with persistent storage if using Sidekiq as ActiveJob queue adapter
 * Redis configured for ActionCable, see `config/cable.yml` (possibly a different Redis instance than that used for Sidekiq/ActiveJob?)
+
+## Temp
+
+```ruby
+def broadcast_conversation_container(target, rand, chat_id)
+  Turbo::StreamsChannel.broadcast_append_to [chat_id, "welcome"], target:, partial: "chats/conversation",
+                                                                  locals: { rand: }
+end
+```
+
+```htm
+<!-- Right now only have the response part working -->
+<div id="messages">
+  <div id="prompt_aaa111">
+    something the user typed in
+  </div>
+  <!-- ChatJob broadcasts this div with random id -->
+  <div id="response_aaa111">
+    <!-- ChatJob then broadcasts each chunk into here -->
+    whatever the llm replied
+  </div>
+
+  <div id="prompt_bbb222">
+    something the user typed in
+  </div>
+  <div id="response_bbb222">
+    whatever the llm replied
+  </div>
+
+  <!-- ... -->
+</div>
+```

@@ -8,6 +8,7 @@
   <%= turbo_stream_from @chat_id, "welcome" %>
 
   <%# Here is where we will stream the responses from the llm %>
+  <%# Eventually this should consist of a sequence of questions and answers %>
   <div id="messages"></div>
 
   <%# The user types in their prompt here %>
