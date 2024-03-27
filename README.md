@@ -28,6 +28,19 @@ This project uses Hotwire for SPA like interactivity features including:
 * Turbo Stream as regular HTTP response to clear our the chat form without requiring a full page refresh
 * [Stimulus](https://github.com/hotwired/stimulus) for some lightweight JS to augment the model responses by converting to markdown and syntax highlighting code blocks (together with the marked and highlight.js libraries).
 
+Example:
+
+```ruby
+# chat_id is randomly assigned earlier to ensure each user gets their own stream
+# and doesn't receive messages intended for a different user.
+
+# [chat_id, "welcome"] - array argument passed to broadcast_append_to, used to construct the unique signed stream name
+
+# This will find a DOM element with id of `some_id` and append "some content" to it, for any client
+# that subscribed to this stream with: <%= turbo_stream_from @chat_id, "welcome" %>
+Turbo::StreamsChannel.broadcast_append_to [chat_id, "welcome"], target: "some_id", html: "some content"
+```
+
 ## Differences in this project from tutorial
 
 ### JavaScript and CSS Handling
@@ -360,8 +373,9 @@ Type in your message/question in the text area and click Send.
 ## Future Features
 
 * WIP ChatJob Refactor
-  * Mixing of logic and presentation concerns in `ChatJob#message_div` - could this be pulled out into a stream erb response that accepts the rand hex number as a local?
-  * If using a strict form of CSP, the injected inline script from ChatJob might get rejected?
+  * better name than `rand`?
+  * extract method for building cache key
+  * broadcast_message is called both if/else rubocop fix
 
 * Maybe related to marked plugin:
   * it removes line breaks, numbered and bullet lists, maybe need to explicitly style these somewhere
@@ -379,6 +393,44 @@ Type in your message/question in the text area and click Send.
 * Auto scroll as conversation exceeds length of viewport
   * Probably a StimulusJS controller with somewhere this logic: `window.scrollTo(0, document.documentElement.scrollHeight);
 
+* Deal with unescaped html warning from marked/highlight - maybe this is expected because of content from model and expect to find code in here? should it be ignored?
+  ```javascript
+  import { Controller } from "@hotwired/stimulus";
+  import { marked } from "marked";
+  import hljs from "highlight.js";
+
+  // Connects to data-controller="markdown-text"
+  export default class extends Controller {
+    static values = { updated: String };
+
+    // Create a new instance of Marked with ignoreUnescapedHTML set to true
+
+    renderer = new marked.Renderer({
+      ignoreUnescapedHTML: true,
+    });
+
+    parser = new marked({
+      renderer: this.renderer,
+    });
+
+    // Anytime `updated` value changes, this function gets called
+
+    updatedValueChanged() {
+      console.log("=== RUNNING MarkdownTextController#updatedValueChanged ===");
+
+      const markdownText = this.element.innerText || "";
+
+      const html = parser.parse(markdownText);
+
+      this.element.innerHTML = html;
+
+      this.element.querySelectorAll("pre").forEach((block) => {
+        hljs.highlightElement(block);
+      });
+    }
+  }
+  ```
+
 ## Deployment
 
 For the tutorial, this only runs locally on a laptop. What would it take to deploy this?
@@ -389,13 +441,6 @@ For the tutorial, this only runs locally on a laptop. What would it take to depl
 * Redis configured for ActionCable, see `config/cable.yml` (possibly a different Redis instance than that used for Sidekiq/ActiveJob?)
 
 ## Temp
-
-```ruby
-def broadcast_conversation_container(target, rand, chat_id)
-  Turbo::StreamsChannel.broadcast_append_to [chat_id, "welcome"], target:, partial: "chats/conversation",
-                                                                  locals: { rand: }
-end
-```
 
 ```htm
 <!-- Right now only have the response part working -->
