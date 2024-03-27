@@ -373,9 +373,8 @@ Type in your message/question in the text area and click Send.
 ## Future Features
 
 * WIP ChatJob Refactor
-  * better name than `rand`?
   * extract method for building cache key
-  * broadcast_message is called both if/else rubocop fix
+  * does it actually need to convert empty string to line break given the use of marked js?
 
 * Maybe related to marked plugin:
   * it removes line breaks, numbered and bullet lists, maybe need to explicitly style these somewhere
