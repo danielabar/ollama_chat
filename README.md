@@ -8,9 +8,18 @@
     - [Encoding](#encoding)
     - [Context](#context)
     - [Separate Sessions](#separate-sessions)
+    - [Introduce Ollama::Client for Communication with Model](#introduce-ollamaclient-for-communication-with-model)
+    - [Configurable model and API endpoint](#configurable-model-and-api-endpoint)
+    - [Extract Turbo Stream Response Partials](#extract-turbo-stream-response-partials)
   - [Project Setup](#project-setup)
   - [Future Features](#future-features)
+    - [Maybe related to marked plugin:](#maybe-related-to-marked-plugin)
+    - [Other](#other)
+    - [Temperature and other options](#temperature-and-other-options)
+    - [Auto scroll as conversation exceeds length of viewport](#auto-scroll-as-conversation-exceeds-length-of-viewport)
+    - [Deal with unescaped html warning from marked/highlight](#deal-with-unescaped-html-warning-from-markedhighlight)
   - [Deployment](#deployment)
+  - [Temp](#temp)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -23,6 +32,19 @@ This project uses Hotwire for SPA like interactivity features including:
 * [Turbo Streams](https://github.com/hotwired/turbo-rails?tab=readme-ov-file#come-alive-with-turbo-streams) over websockets (via ActionCable) to stream the response from the LLM to the UI.
 * Turbo Stream as regular HTTP response to clear our the chat form without requiring a full page refresh
 * [Stimulus](https://github.com/hotwired/stimulus) for some lightweight JS to augment the model responses by converting to markdown and syntax highlighting code blocks (together with the marked and highlight.js libraries).
+
+Example:
+
+```ruby
+# chat_id is randomly assigned earlier to ensure each user gets their own stream
+# and doesn't receive messages intended for a different user.
+
+# [chat_id, "welcome"] - array argument passed to broadcast_append_to, used to construct the unique signed stream name
+
+# This will find a DOM element with id of `some_id` and append "some content" to it, for any client
+# that subscribed to this stream with: <%= turbo_stream_from @chat_id, "welcome" %>
+Turbo::StreamsChannel.broadcast_append_to [chat_id, "welcome"], target: "some_id", html: "some content"
+```
 
 ## Differences in this project from tutorial
 
@@ -83,6 +105,10 @@ json = JSON.parse(chunk.force_encoding("UTF-8"))
 ```
 
 ### Context
+
+> The context parameter returned from a previous request to /generate, this can be used to keep a short conversational memory.
+
+An encoding of the conversation used in this response, this can be sent in the next request to keep a conversational memory
 
 The original tutorial does not include context for conversational history. To have the model remember the past conversations you've been having with it, need to save the `context` from the Ollama [REST API](https://github.com/ollama/ollama/blob/main/docs/api.md) response (for eg: in Rails cache), then include this context in the next Ollama REST API request.
 
@@ -231,6 +257,95 @@ class ChatJob < ApplicationJob
 end
 ```
 
+### Introduce Ollama::Client for Communication with Model
+
+In the original tutorial, the ChatJob is also responsible for all the stream http request/response with the Ollama REST API.
+
+In this project, that responsibility has been split out to `Ollama::Client` to handle the request, and stream the response back to the client by yielding to a given block.
+
+### Configurable model and API endpoint
+
+In the original tutorial, the model `mistral:latest` and API url `http://localhost:11434/api/generate` are hard-coded in the `ChatJob`. In this version, they're set as environment variables, for example in `.env`:
+
+```bash
+CHAT_API_URL=http://localhost:11434/api/generate
+
+# See other values at: https://ollama.com/library
+CHAT_MODEL=mistral:latest
+```
+
+These are read from a new configuration file:
+
+```yml
+# config/chat.yml
+default: &default
+  chat_api_url: <%= ENV.fetch("CHAT_API_URL") { "http://localhost:11434/api/generate" } %>
+  chat_model: <%= ENV.fetch("CHAT_MODEL") { "mistral:latest" } %>
+
+development:
+  <<: *default
+
+test:
+  <<: *default
+
+production:
+  chat_api_url: <%= ENV["CHAT_API_URL"] %>
+  chat_model: <%= ENV["CHAT_MODEL"] %>
+```
+
+This config is loaded in the application:
+
+```ruby
+# config/application.rb
+module OllamaChat
+  class Application < Rails::Application
+    # ...
+
+    # Load custom config
+    config.chat = config_for(:chat)
+  end
+end
+```
+
+Then it can be used by `Ollama::Client`:
+
+```ruby
+# lib/ollama/client.rb
+module Ollama
+  class Client
+    def initialize(model = nil)
+      @uri = URI(Rails.application.config.chat["chat_api_url"])
+      @model = model || Rails.application.config.chat["chat_model"]
+    end
+
+    # ...
+  end
+end
+```
+
+### Extract Turbo Stream Response Partials
+
+In the original tutorial, the response message div is broadcast from the ChatJob, which takes on the responsibility of building the html response as a heredoc string. In this version, that's extracted to a view partial `app/views/chats/_response.html.erb` that accepts a local variable `rand`:
+
+```erb
+<div id="<%= rand %>"
+     data-controller='markdown-text'
+     data-markdown-text-updated-value=''
+     class='border border-blue-500 bg-blue-100 text-blue-800 p-2 rounded-xl mb-2'>
+</div>
+```
+
+And here is the modified ChatJob method that broadcasts the partial, specifying the value for the `rand` local variable:
+
+```ruby
+def broadcast_response_container(target, rand, chat_id)
+  Turbo::StreamsChannel.broadcast_append_to [chat_id, "welcome"], target:, partial: "chats/response",
+                                                                  locals: { rand: }
+end
+```
+
+The idea is to avoid presentational concerns in the business logic.
+
 ## Project Setup
 
 Install:
@@ -250,6 +365,9 @@ In another terminal:
 # Fetch the LLM (Ref: https://ollama.com/library)
 ollama pull mistral:latest
 
+# Environment variables
+cp .env.template .env
+
 # Install projects dependencies and setup database
 bin/setup
 
@@ -266,28 +384,71 @@ Type in your message/question in the text area and click Send.
 
 ## Future Features
 
-* ChatJob Refactor
-  * Extract interaction with Ollama REST API to `OllamaClient`, something like this: https://github.com/danielabar/echo-weather-rails/blob/main/lib/weather/client.rb
-  * Would the ChatJob http code be easier to read with Faraday? It does support [streaming responses](https://lostisland.github.io/faraday/#/adapters/custom/streaming)
-  * Model URI should be config/env var rather than hard-coded
-  * Mixing of logic and presentation concerns in `ChatJob#message_div` - could this be pulled out into a stream erb response that accepts the rand hex number as a local?
-  * Is Redis needed for ActionCable re: `Turbo::StreamsChannel.broadcast_append_to "welcome", target:, html: message` in `ChatJob`?
-    * Yes in production, see `config/cable.yml`
-  * If using a strict form of CSP, the injected inline script from ChatJob might get rejected?
-
-* Maybe related to marked plugin:
+### Maybe related to marked plugin:
   * it removes line breaks, numbered and bullet lists, maybe need to explicitly style these somewhere
   * Also see advanced options: https://marked.js.org/using_advanced#options
   * Maybe need tailwind apply something like this but not exactly: https://dev.to/ewatch/styling-markdown-generated-html-with-tailwind-css-and-parsedown-328d
   * Why aren't code responses from model indented? Should the indents be coming from model response or is this considered client side formatting?
 
-* Also broadcast the question in a different styled div so it looks like a Q & A conversation
+### Other
+* Broadcast the question in a different styled div so it looks like a Q & A conversation
 * Allow user to select from list of available models (how to handle if prompt format is different for each?)
 * Save chat history
 * Ability to start a new chat
 * Run the same prompt against 2 or more models at the same time for comparison
 * Cancel response? (model could get stuck in a loop...)
-* Auto scroll as conversation exceeds length of viewport
+* Keep model in memory longer? (first time load is slow), see Ollama docs, default is 5m: `keep_alive` setting in request body
+* `/api/generate` final response contains statistics, maybe log/save those somewhere. To calculate how fast the response is generated in tokens per second (token/s), divide `eval_count` / `eval_duration`.
+
+### Temperature and other options
+  * Currently its set "flat" in request body, but [Ollama REST API](https://github.com/ollama/ollama/blob/main/docs/api.md#generate-a-completion) says it should be in `options`
+  * Valid options from model file: https://github.com/ollama/ollama/blob/main/docs/modelfile.md#valid-parameters-and-values
+  * Allow user to customize `temperature` - higher is more creative, lower is more coherent
+  * Also note context size can be customized (although maybe depends on limitations of model?) `num_ctx 4096`
+  * Another option: `num_thread` - set to num physical cpu cores
+
+### Auto scroll as conversation exceeds length of viewport
+  * Probably a StimulusJS controller with somewhere this logic: `window.scrollTo(0, document.documentElement.scrollHeight);
+
+### Deal with unescaped html warning from marked/highlight
+
+Maybe this is expected because of content from model and expect to find code in here? should it be ignored?
+  ```javascript
+  import { Controller } from "@hotwired/stimulus";
+  import { marked } from "marked";
+  import hljs from "highlight.js";
+
+  // Connects to data-controller="markdown-text"
+  export default class extends Controller {
+    static values = { updated: String };
+
+    // Create a new instance of Marked with ignoreUnescapedHTML set to true
+
+    renderer = new marked.Renderer({
+      ignoreUnescapedHTML: true,
+    });
+
+    parser = new marked({
+      renderer: this.renderer,
+    });
+
+    // Anytime `updated` value changes, this function gets called
+
+    updatedValueChanged() {
+      console.log("=== RUNNING MarkdownTextController#updatedValueChanged ===");
+
+      const markdownText = this.element.innerText || "";
+
+      const html = parser.parse(markdownText);
+
+      this.element.innerHTML = html;
+
+      this.element.querySelectorAll("pre").forEach((block) => {
+        hljs.highlightElement(block);
+      });
+    }
+  }
+  ```
 
 ## Deployment
 
@@ -297,3 +458,28 @@ For the tutorial, this only runs locally on a laptop. What would it take to depl
 * Sidekiq or some other production quality [backend for ActiveJob](https://guides.rubyonrails.org/active_job_basics.html#backends)
 * Redis configured with persistent storage if using Sidekiq as ActiveJob queue adapter
 * Redis configured for ActionCable, see `config/cable.yml` (possibly a different Redis instance than that used for Sidekiq/ActiveJob?)
+
+## Temp
+
+```htm
+<!-- Right now only have the response part working -->
+<div id="messages">
+  <div id="prompt_aaa111">
+    something the user typed in
+  </div>
+  <!-- ChatJob broadcasts this div with random id -->
+  <div id="response_aaa111">
+    <!-- ChatJob then broadcasts each chunk into here -->
+    whatever the llm replied
+  </div>
+
+  <div id="prompt_bbb222">
+    something the user typed in
+  </div>
+  <div id="response_bbb222">
+    whatever the llm replied
+  </div>
+
+  <!-- ... -->
+</div>
+```
