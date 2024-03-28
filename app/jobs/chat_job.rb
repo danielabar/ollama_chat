@@ -5,8 +5,9 @@ class ChatJob < ApplicationJob
 
   def perform(prompt, chat_id)
     rand = SecureRandom.hex(10)
+    prompt_id = "prompt_#{rand}"
     response_id = "response_#{rand}"
-    broadcast_response_container("messages", response_id, chat_id)
+    broadcast_response_container("messages", prompt, prompt_id, response_id, chat_id)
 
     cached_context = Rails.cache.read(context_cache_key(chat_id))
     client = Ollama::Client.new
@@ -36,9 +37,9 @@ class ChatJob < ApplicationJob
     end
   end
 
-  def broadcast_response_container(target, response_id, chat_id)
+  def broadcast_response_container(target, prompt, prompt_id, response_id, chat_id)
     Turbo::StreamsChannel.broadcast_append_to [chat_id, "welcome"], target:, partial: "chats/response",
-                                                                    locals: { response_id: }
+                                                                    locals: { prompt_id:, prompt:, response_id: }
   end
 
   def broadcast_response_chunk(response_id, message, chat_id)

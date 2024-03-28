@@ -11,6 +11,7 @@
     - [Introduce Ollama::Client for Communication with Model](#introduce-ollamaclient-for-communication-with-model)
     - [Configurable model and API endpoint](#configurable-model-and-api-endpoint)
     - [Extract Turbo Stream Response Partials](#extract-turbo-stream-response-partials)
+    - [Display Conversation](#display-conversation)
   - [Project Setup](#project-setup)
   - [Future Features](#future-features)
     - [Maybe related to marked plugin:](#maybe-related-to-marked-plugin)
@@ -25,7 +26,11 @@
 
 # Ollama Chat Rails
 
-Rails project from following along with [Streaming LLM Responses  ▶️](https://youtu.be/hSxmEZjCPP8?si=ps__eK0MbuSDFPXw) for building a streaming AI chatbot with Rails and Ollama.
+The starting point for this Rails project was from the [Streaming LLM Responses  ▶️](https://youtu.be/hSxmEZjCPP8?si=ps__eK0MbuSDFPXw) tutorial for building a streaming AI chatbot with Rails and Ollama. Then many more features were added as well as some refactoring for maintainability.
+
+It looks something like this:
+
+![conversation](docs/conversation.png "conversation")
 
 This project uses Hotwire for SPA like interactivity features including:
 
@@ -261,7 +266,77 @@ end
 
 In the original tutorial, the ChatJob is also responsible for all the stream http request/response with the Ollama REST API.
 
-In this project, that responsibility has been split out to `Ollama::Client` to handle the request, and stream the response back to the client by yielding to a given block.
+In this project, that responsibility has been split out to `Ollama::Client` to handle the request, and stream the response back to the client by yielding to a given block:
+
+```ruby
+# lib/ollama/client.rb
+require "net/http"
+
+module Ollama
+  class Client
+    def initialize(model = nil)
+      @uri = URI(Rails.application.config.chat["chat_api_url"])
+      @model = model || Rails.application.config.chat["chat_model"]
+    end
+
+    def request(prompt, cached_context, &)
+      request = build_request(prompt, cached_context)
+      # Pass the block to `send_request` as `&`
+      # so that it can be yielded to
+      send_request(request, &)
+    end
+
+    private
+
+    def build_request(prompt, cached_context)
+      request = Net::HTTP::Post.new(@uri, "Content-Type" => "application/json")
+      request.body = {
+        model: @model,
+        prompt: context(prompt),
+        context: cached_context,
+        temperature: 1,
+        stream: true
+      }.to_json
+      request
+    end
+
+    # Since this is a streaming response, yield each `chunk`
+    # to the given block.
+    def send_request(request)
+      Net::HTTP.start(@uri.hostname, @uri.port) do |http|
+        http.request(request) do |response|
+          response.read_body do |chunk|
+            encoded_chunk = chunk.force_encoding("UTF-8")
+            Rails.logger.info("✅ #{encoded_chunk}")
+            yield encoded_chunk if block_given?
+          end
+        end
+      end
+    end
+
+    def context(prompt)
+      "[INST]#{prompt}[/INST]"
+    end
+  end
+end
+```
+
+The `ChatJob` uses the Ollama client as follows:
+
+```ruby
+def perform(prompt, chat_id)
+  rand = SecureRandom.hex(10)
+  prompt_id = "prompt_#{rand}"
+  response_id = "response_#{rand}"
+  broadcast_response_container("messages", prompt, prompt_id, response_id, chat_id)
+
+  cached_context = Rails.cache.read(context_cache_key(chat_id))
+  client = Ollama::Client.new
+  client.request(prompt, cached_context) do |chunk|
+    process_chunk(chunk, response_id, chat_id)
+  end
+end
+```
 
 ### Configurable model and API endpoint
 
@@ -323,6 +398,19 @@ module Ollama
 end
 ```
 
+Also update the main index view to display which model is being used:
+
+```erb
+<!-- app/views/welcome/index.html.erb -->
+<div class="w-full">
+  <span class="bg-yellow-200 border-yellow-400 text-yellow-700 px-4 py-2 mb-4 rounded-full inline-block">
+    Using model: <%= Rails.application.config.chat["chat_model"] %>
+  </span>
+
+  ...
+</div>
+```
+
 ### Extract Turbo Stream Response Partials
 
 In the original tutorial, the response message div is broadcast from the ChatJob, which takes on the responsibility of building the html response as a heredoc string. In this version, that's extracted to a view partial `app/views/chats/_response.html.erb` that accepts a local variable `rand`:
@@ -345,6 +433,39 @@ end
 ```
 
 The idea is to avoid presentational concerns in the business logic.
+
+### Display Conversation
+
+In the original tutorial, only the model responses are displayed. In this version, it also captures the prompt the user provided, and broadcasts that back to the UI in a different styled div. This way the total display shows a question and answer style conversation.
+
+To also display the question, the response partial now has "You" and "Model" sections as follows:
+
+```erb
+<!-- app/views/chats/_response.html.erb -->
+<div class="response-container">
+  <span class="font-semibold text-lg opacity-60 tracking-wide">You</span>
+  <div id="<%= prompt_id %>"
+      class='border border-green-500 bg-green-100 text-green-800 p-2 rounded-xl mb-7'>
+      <%= prompt %>
+  </div>
+
+  <span class="font-semibold text-lg opacity-60 tracking-wide">Model</span>
+  <div id="<%= response_id %>"
+      data-controller='markdown-text'
+      data-markdown-text-updated-value=''
+      class='border border-blue-500 bg-blue-100 text-blue-800 p-2 rounded-xl mb-7'>
+  </div>
+</div>
+```
+
+And the `ChatJob` that broadcasts this partial provides all the necessary locals, including original prompt from user:
+
+```ruby
+def broadcast_response_container(target, prompt, prompt_id, response_id, chat_id)
+  Turbo::StreamsChannel.broadcast_append_to [chat_id, "welcome"], target:, partial: "chats/response",
+                                                                  locals: { prompt_id:, prompt:, response_id: }
+end
+```
 
 ## Project Setup
 
@@ -384,6 +505,8 @@ Type in your message/question in the text area and click Send.
 
 ## Future Features
 
+WIP: Broadcast the question in a different styled div so it looks like a Q & A conversation
+
 ### Maybe related to marked plugin:
   * it removes line breaks, numbered and bullet lists, maybe need to explicitly style these somewhere
   * Also see advanced options: https://marked.js.org/using_advanced#options
@@ -391,7 +514,6 @@ Type in your message/question in the text area and click Send.
   * Why aren't code responses from model indented? Should the indents be coming from model response or is this considered client side formatting?
 
 ### Other
-* Broadcast the question in a different styled div so it looks like a Q & A conversation
 * Allow user to select from list of available models (how to handle if prompt format is different for each?)
 * Save chat history
 * Ability to start a new chat
