@@ -505,8 +505,6 @@ Type in your message/question in the text area and click Send.
 
 ## Future Features
 
-WIP: Broadcast the question in a different styled div so it looks like a Q & A conversation
-
 ### Maybe related to marked plugin:
   * it removes line breaks, numbered and bullet lists, maybe need to explicitly style these somewhere
   * Also see advanced options: https://marked.js.org/using_advanced#options
