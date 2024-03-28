@@ -8,7 +8,7 @@ class ChatJob < ApplicationJob
     response_id = "response_#{rand}"
     broadcast_response_container("messages", response_id, chat_id)
 
-    cached_context = Rails.cache.read("context_#{chat_id}")
+    cached_context = Rails.cache.read(context_cache_key(chat_id))
     client = Ollama::Client.new
     client.request(prompt, cached_context) do |chunk|
       process_chunk(chunk, response_id, chat_id)
@@ -17,16 +17,18 @@ class ChatJob < ApplicationJob
 
   private
 
+  def context_cache_key(chat_id)
+    "context_#{chat_id}"
+  end
+
   def process_chunk(chunk, response_id, chat_id)
     json = JSON.parse(chunk)
     done = json["done"]
     if done
       Rails.logger.info("🎉 Done streaming response for chat_id #{chat_id}.")
 
-      # cache context for next inference
       context = json["context"]
-      cache_key = "context_#{chat_id}"
-      Rails.cache.write(cache_key, context)
+      Rails.cache.write(context_cache_key(chat_id), context)
       broadcast_markdown_updater(response_id, chat_id)
     else
       message = json["response"].to_s.strip.empty? ? "<br/>" : json["response"]

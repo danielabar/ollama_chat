@@ -10,9 +10,15 @@
     - [Separate Sessions](#separate-sessions)
     - [Introduce Ollama::Client for Communication with Model](#introduce-ollamaclient-for-communication-with-model)
     - [Configurable model and API endpoint](#configurable-model-and-api-endpoint)
-  - [Extract Turbo Stream Response Partials](#extract-turbo-stream-response-partials)
+    - [Extract Turbo Stream Response Partials](#extract-turbo-stream-response-partials)
   - [Project Setup](#project-setup)
   - [Future Features](#future-features)
+    - [WIP ChatJob Refactor](#wip-chatjob-refactor)
+    - [Maybe related to marked plugin:](#maybe-related-to-marked-plugin)
+    - [Other](#other)
+    - [Temperature and other options](#temperature-and-other-options)
+    - [Auto scroll as conversation exceeds length of viewport](#auto-scroll-as-conversation-exceeds-length-of-viewport)
+    - [Deal with unescaped html warning from marked/highlight](#deal-with-unescaped-html-warning-from-markedhighlight)
   - [Deployment](#deployment)
   - [Temp](#temp)
 
@@ -100,6 +106,10 @@ json = JSON.parse(chunk.force_encoding("UTF-8"))
 ```
 
 ### Context
+
+> The context parameter returned from a previous request to /generate, this can be used to keep a short conversational memory.
+
+An encoding of the conversation used in this response, this can be sent in the next request to keep a conversational memory
 
 The original tutorial does not include context for conversational history. To have the model remember the past conversations you've been having with it, need to save the `context` from the Ollama [REST API](https://github.com/ollama/ollama/blob/main/docs/api.md) response (for eg: in Rails cache), then include this context in the next Ollama REST API request.
 
@@ -314,7 +324,7 @@ module Ollama
 end
 ```
 
-## Extract Turbo Stream Response Partials
+### Extract Turbo Stream Response Partials
 
 In the original tutorial, the response message div is broadcast from the ChatJob, which takes on the responsibility of building the html response as a heredoc string. In this version, that's extracted to a view partial `app/views/chats/_response.html.erb` that accepts a local variable `rand`:
 
@@ -372,27 +382,38 @@ Type in your message/question in the text area and click Send.
 
 ## Future Features
 
-* WIP ChatJob Refactor
-  * extract method for building cache key
+### WIP ChatJob Refactor
   * does it actually need to convert empty string to line break given the use of marked js?
 
-* Maybe related to marked plugin:
+### Maybe related to marked plugin:
   * it removes line breaks, numbered and bullet lists, maybe need to explicitly style these somewhere
   * Also see advanced options: https://marked.js.org/using_advanced#options
   * Maybe need tailwind apply something like this but not exactly: https://dev.to/ewatch/styling-markdown-generated-html-with-tailwind-css-and-parsedown-328d
   * Why aren't code responses from model indented? Should the indents be coming from model response or is this considered client side formatting?
 
+### Other
 * Broadcast the question in a different styled div so it looks like a Q & A conversation
 * Allow user to select from list of available models (how to handle if prompt format is different for each?)
 * Save chat history
 * Ability to start a new chat
 * Run the same prompt against 2 or more models at the same time for comparison
 * Cancel response? (model could get stuck in a loop...)
+* Keep model in memory longer? (first time load is slow), see Ollama docs, default is 5m: `keep_alive` setting in request body
+* `/api/generate` final response contains statistics, maybe log/save those somewhere. To calculate how fast the response is generated in tokens per second (token/s), divide `eval_count` / `eval_duration`.
 
-* Auto scroll as conversation exceeds length of viewport
+### Temperature and other options
+  * Currently its set "flat" in request body, but [Ollama REST API](https://github.com/ollama/ollama/blob/main/docs/api.md#generate-a-completion) says it should be in `options`
+  * Valid options from model file: https://github.com/ollama/ollama/blob/main/docs/modelfile.md#valid-parameters-and-values
+  * Allow user to customize `temperature` - higher is more creative, lower is more coherent
+  * Also note context size can be customized (although maybe depends on limitations of model?) `num_ctx 4096`
+  * Another option: `num_thread` - set to num physical cpu cores
+
+### Auto scroll as conversation exceeds length of viewport
   * Probably a StimulusJS controller with somewhere this logic: `window.scrollTo(0, document.documentElement.scrollHeight);
 
-* Deal with unescaped html warning from marked/highlight - maybe this is expected because of content from model and expect to find code in here? should it be ignored?
+### Deal with unescaped html warning from marked/highlight
+
+Maybe this is expected because of content from model and expect to find code in here? should it be ignored?
   ```javascript
   import { Controller } from "@hotwired/stimulus";
   import { marked } from "marked";
