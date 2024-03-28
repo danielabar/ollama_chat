@@ -365,6 +365,9 @@ In another terminal:
 # Fetch the LLM (Ref: https://ollama.com/library)
 ollama pull mistral:latest
 
+# Environment variables
+cp .env.template .env
+
 # Install projects dependencies and setup database
 bin/setup
 
