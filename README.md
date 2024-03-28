@@ -13,7 +13,6 @@
     - [Extract Turbo Stream Response Partials](#extract-turbo-stream-response-partials)
   - [Project Setup](#project-setup)
   - [Future Features](#future-features)
-    - [WIP ChatJob Refactor](#wip-chatjob-refactor)
     - [Maybe related to marked plugin:](#maybe-related-to-marked-plugin)
     - [Other](#other)
     - [Temperature and other options](#temperature-and-other-options)
@@ -381,9 +380,6 @@ Navigate to `http://localhost:3000`
 Type in your message/question in the text area and click Send.
 
 ## Future Features
-
-### WIP ChatJob Refactor
-  * does it actually need to convert empty string to line break given the use of marked js?
 
 ### Maybe related to marked plugin:
   * it removes line breaks, numbered and bullet lists, maybe need to explicitly style these somewhere
