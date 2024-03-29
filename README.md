@@ -20,7 +20,6 @@
     - [Auto scroll as conversation exceeds length of viewport](#auto-scroll-as-conversation-exceeds-length-of-viewport)
     - [Deal with unescaped html warning from marked/highlight](#deal-with-unescaped-html-warning-from-markedhighlight)
   - [Deployment](#deployment)
-  - [Temp](#temp)
 
 <!-- END doctoc generated TOC please keep comment here to allow auto update -->
 
@@ -578,28 +577,3 @@ For the tutorial, this only runs locally on a laptop. What would it take to depl
 * Sidekiq or some other production quality [backend for ActiveJob](https://guides.rubyonrails.org/active_job_basics.html#backends)
 * Redis configured with persistent storage if using Sidekiq as ActiveJob queue adapter
 * Redis configured for ActionCable, see `config/cable.yml` (possibly a different Redis instance than that used for Sidekiq/ActiveJob?)
-
-## Temp
-
-```htm
-<!-- Right now only have the response part working -->
-<div id="messages">
-  <div id="prompt_aaa111">
-    something the user typed in
-  </div>
-  <!-- ChatJob broadcasts this div with random id -->
-  <div id="response_aaa111">
-    <!-- ChatJob then broadcasts each chunk into here -->
-    whatever the llm replied
-  </div>
-
-  <div id="prompt_bbb222">
-    something the user typed in
-  </div>
-  <div id="response_bbb222">
-    whatever the llm replied
-  </div>
-
-  <!-- ... -->
-</div>
-```
