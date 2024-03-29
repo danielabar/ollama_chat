@@ -5,11 +5,6 @@ import hljs from "highlight.js"
 // Connects to data-controller="markdown-text"
 export default class extends Controller {
   static values = { updated: String }
-  // connect() {
-  //   // temp debug
-  //   console.dir(marked);
-  //   console.dir(hljs);
-  // }
 
   // Anytime `updated` value changes, this function gets called
   updatedValueChanged() {
