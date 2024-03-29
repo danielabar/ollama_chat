@@ -17,7 +17,6 @@
   - [Future Features](#future-features)
     - [Copy model response to clipboard](#copy-model-response-to-clipboard)
     - [Temperature and other options](#temperature-and-other-options)
-    - [WIP Auto scroll as conversation exceeds length of viewport](#wip-auto-scroll-as-conversation-exceeds-length-of-viewport)
     - [Deal with unescaped html warning from marked/highlight](#deal-with-unescaped-html-warning-from-markedhighlight)
   - [Deployment](#deployment)
 
@@ -572,9 +571,6 @@ Somewhere in _response.html.erb but has to be outside of the div where broadcast
   * Allow user to customize `temperature` - higher is more creative, lower is more coherent
   * Also note context size can be customized (although maybe depends on limitations of model?) `num_ctx 4096`
   * Another option: `num_thread` - set to num physical cpu cores
-
-### WIP Auto scroll as conversation exceeds length of viewport
-  * Probably a StimulusJS controller with somewhere this logic: `window.scrollTo(0, document.documentElement.scrollHeight);`
 
 ### Deal with unescaped html warning from marked/highlight
 
