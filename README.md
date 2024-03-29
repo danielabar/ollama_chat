@@ -12,9 +12,9 @@
     - [Configurable model and API endpoint](#configurable-model-and-api-endpoint)
     - [Extract Turbo Stream Response Partials](#extract-turbo-stream-response-partials)
     - [Display Conversation](#display-conversation)
+    - [Markdown Styling](#markdown-styling)
   - [Project Setup](#project-setup)
   - [Future Features](#future-features)
-    - [Maybe related to marked plugin:](#maybe-related-to-marked-plugin)
     - [Other](#other)
     - [Temperature and other options](#temperature-and-other-options)
     - [Auto scroll as conversation exceeds length of viewport](#auto-scroll-as-conversation-exceeds-length-of-viewport)
@@ -466,6 +466,34 @@ def broadcast_response_container(target, prompt, prompt_id, response_id, chat_id
 end
 ```
 
+### Markdown Styling
+
+The original tutorial uses Bootstrap. Since this project uses TailwindCSS, it requires a different solution for dynamically styling the HTML that gets generated from the marked JavaScript library. The solution is to use the Tailwind [Typography](https://github.com/tailwindlabs/tailwindcss-typography) plugin. Simply add `prose` and desired modifiers to the response HTML element that contains the streaming response from the model, and the plugin will apply styles to make it legible.
+
+For example:
+
+```erb
+<!-- app/views/chats/_response.html.erb -->
+<div class="response-container">
+  <span class="font-semibold text-lg opacity-60 tracking-wide">You</span>
+  <div id="<%= prompt_id %>"
+      class='prose prose-lg max-w-none border border-green-500 bg-green-100 p-4 rounded-xl mb-7'>
+      <p><%= prompt %></p>
+  </div>
+
+  <span class="font-semibold text-lg opacity-60 tracking-wide">Model</span>
+  <div id="<%= response_id %>"
+      data-controller='markdown-text'
+      data-markdown-text-updated-value=''
+      class='prose prose-lg max-w-none border border-blue-500 bg-blue-100 p-4 rounded-xl mb-7'>
+  </div>
+</div>
+```
+
+It will look something like this:
+
+![markdown prose](docs/markdown-prose.png "markdown prose")
+
 ## Project Setup
 
 Install:
@@ -504,11 +532,7 @@ Type in your message/question in the text area and click Send.
 
 ## Future Features
 
-### Maybe related to marked plugin:
-  * it removes line breaks, numbered and bullet lists, maybe need to explicitly style these somewhere
-  * Also see advanced options: https://marked.js.org/using_advanced#options
-  * Maybe need tailwind apply something like this but not exactly: https://dev.to/ewatch/styling-markdown-generated-html-with-tailwind-css-and-parsedown-328d
-  * Why aren't code responses from model indented? Should the indents be coming from model response or is this considered client side formatting?
+WIP: Markdown styles
 
 ### Other
 * Allow user to select from list of available models (how to handle if prompt format is different for each?)
