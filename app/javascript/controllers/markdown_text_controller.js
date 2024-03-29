@@ -11,12 +11,13 @@ export default class extends Controller {
     console.log("=== RUNNING MarkdownTextController#updatedValueChanged ===")
     const markdownText = this.element.innerText || ""
     const html = marked.parse(markdownText)
-    // temp debug
     console.dir(html)
 
     this.element.innerHTML = html
     this.element.querySelectorAll("pre").forEach((block) => {
       hljs.highlightElement(block)
     })
+
+    window.scrollTo(0, document.documentElement.scrollHeight);
   }
 }
