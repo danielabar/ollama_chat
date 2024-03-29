@@ -15,7 +15,6 @@
     - [Markdown Styling](#markdown-styling)
   - [Project Setup](#project-setup)
   - [Future Features](#future-features)
-    - [Other](#other)
     - [Temperature and other options](#temperature-and-other-options)
     - [Auto scroll as conversation exceeds length of viewport](#auto-scroll-as-conversation-exceeds-length-of-viewport)
     - [Deal with unescaped html warning from marked/highlight](#deal-with-unescaped-html-warning-from-markedhighlight)
@@ -532,9 +531,6 @@ Type in your message/question in the text area and click Send.
 
 ## Future Features
 
-WIP: Markdown styles
-
-### Other
 * Allow user to select from list of available models (how to handle if prompt format is different for each?)
 * Save chat history
 * Ability to start a new chat
