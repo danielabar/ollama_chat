@@ -15,8 +15,8 @@
     - [Markdown Styling](#markdown-styling)
   - [Project Setup](#project-setup)
   - [Future Features](#future-features)
+    - [Copy model response to clipboard](#copy-model-response-to-clipboard)
     - [Temperature and other options](#temperature-and-other-options)
-    - [Auto scroll as conversation exceeds length of viewport](#auto-scroll-as-conversation-exceeds-length-of-viewport)
     - [Deal with unescaped html warning from marked/highlight](#deal-with-unescaped-html-warning-from-markedhighlight)
   - [Deployment](#deployment)
 
@@ -539,15 +539,38 @@ Type in your message/question in the text area and click Send.
 * Keep model in memory longer? (first time load is slow), see Ollama docs, default is 5m: `keep_alive` setting in request body
 * `/api/generate` final response contains statistics, maybe log/save those somewhere. To calculate how fast the response is generated in tokens per second (token/s), divide `eval_count` / `eval_duration`.
 
+### Copy model response to clipboard
+
+* clipboard stimulusjs controller?
+
+```javascript
+static targets = ["source"]
+
+copy() {
+  text = this.sourceTarget.select();
+  navigator.clipboard.writeText(text)
+    .then(() => {
+      console.log('Text copied to clipboard');
+    })
+    .catch((error) => {
+      console.error('Failed to copy text to clipboard:', error);
+    });
+}
+```
+
+Somewhere in _response.html.erb but has to be outside of the div where broadcasting model response:
+```erb
+<button data-action="markdown#copy">
+  Copy to clipboard
+</button>
+```
+
 ### Temperature and other options
   * Currently its set "flat" in request body, but [Ollama REST API](https://github.com/ollama/ollama/blob/main/docs/api.md#generate-a-completion) says it should be in `options`
   * Valid options from model file: https://github.com/ollama/ollama/blob/main/docs/modelfile.md#valid-parameters-and-values
   * Allow user to customize `temperature` - higher is more creative, lower is more coherent
   * Also note context size can be customized (although maybe depends on limitations of model?) `num_ctx 4096`
   * Another option: `num_thread` - set to num physical cpu cores
-
-### Auto scroll as conversation exceeds length of viewport
-  * Probably a StimulusJS controller with somewhere this logic: `window.scrollTo(0, document.documentElement.scrollHeight);`
 
 ### Deal with unescaped html warning from marked/highlight
 
