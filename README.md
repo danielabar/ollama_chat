@@ -13,6 +13,7 @@
     - [Extract Turbo Stream Response Partials](#extract-turbo-stream-response-partials)
     - [Display Conversation](#display-conversation)
     - [Markdown Styling](#markdown-styling)
+    - [Auto Scroll](#auto-scroll)
   - [Project Setup](#project-setup)
   - [Future Features](#future-features)
     - [Copy model response to clipboard](#copy-model-response-to-clipboard)
@@ -492,6 +493,38 @@ For example:
 It will look something like this:
 
 ![markdown prose](docs/markdown-prose.png "markdown prose")
+
+### Auto Scroll
+
+In the original tutorial, as the conversation grows in length and the model responses keep streaming, it will go outside of the visible viewport, requiring the user to manually scroll. This project adds a scroll command as the last part of the markdown stimulus controller (which only gets invoked when model is done responding), to also scroll to the end of the viewport. Arguably this logic could be in a separate scroll controller:
+
+```javascript
+// app/javascript/controllers/markdown_text_controller.js
+import { Controller } from "@hotwired/stimulus"
+import { marked } from "marked"
+import hljs from "highlight.js"
+
+// Connects to data-controller="markdown-text"
+export default class extends Controller {
+  static values = { updated: String }
+
+  // Anytime `updated` value changes, this function gets called
+  updatedValueChanged() {
+    console.log("=== RUNNING MarkdownTextController#updatedValueChanged ===")
+    const markdownText = this.element.innerText || ""
+    const html = marked.parse(markdownText)
+    console.dir(html)
+
+    this.element.innerHTML = html
+    this.element.querySelectorAll("pre").forEach((block) => {
+      hljs.highlightElement(block)
+    })
+
+    // Scroll to end of viewport.
+    window.scrollTo(0, document.documentElement.scrollHeight);
+  }
+}
+```
 
 ## Project Setup
 
