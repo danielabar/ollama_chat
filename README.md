@@ -547,7 +547,7 @@ Type in your message/question in the text area and click Send.
   * Another option: `num_thread` - set to num physical cpu cores
 
 ### Auto scroll as conversation exceeds length of viewport
-  * Probably a StimulusJS controller with somewhere this logic: `window.scrollTo(0, document.documentElement.scrollHeight);
+  * Probably a StimulusJS controller with somewhere this logic: `window.scrollTo(0, document.documentElement.scrollHeight);`
 
 ### Deal with unescaped html warning from marked/highlight
 
