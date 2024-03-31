@@ -17,7 +17,6 @@
     - [Copy Model Response to Clipboard](#copy-model-response-to-clipboard)
   - [Project Setup](#project-setup)
   - [Future Features](#future-features)
-    - [WIP: Copy model response to clipboard](#wip-copy-model-response-to-clipboard)
     - [Temperature and other options](#temperature-and-other-options)
     - [Deal with unescaped html warning from marked/highlight](#deal-with-unescaped-html-warning-from-markedhighlight)
   - [Deployment](#deployment)
@@ -589,20 +588,26 @@ export default class extends Controller {
 
 ### Copy Model Response to Clipboard
 
-This project adds a "copy to clipboard" feature. A button renders beneath each model response. When clicked, the model response text is copied to the clipboard. A "clipboard" stimulus JS controller is used for this:
+This project adds a "copy to clipboard" feature. A button renders beneath each model response. When clicked, the model response text is copied to the clipboard. A "clipboard" stimulus JS controller is used for this. It uses the clipboard API, if copy is successful, it briefly updates the button text to show "copied", so the user knows it worked:
 
 ```javascript
 // app/javascript/controllers/clipboard_controller.js
 import { Controller } from "@hotwired/stimulus";
 
 export default class extends Controller {
-  static targets = ["source"]
+  static targets = ["source", "button"]
+  connect() {
+  }
 
   copy() {
     const text = this.sourceTarget.innerText
     navigator.clipboard.writeText(text)
       .then(() => {
         console.log('Text copied to clipboard');
+        this.buttonTarget.textContent = 'Copied';
+        setTimeout(() => {
+          this.buttonTarget.textContent = 'Copy';
+        }, 2000);
       })
       .catch((error) => {
         console.error('Failed to copy text to clipboard:', error);
@@ -623,21 +628,26 @@ This controller is hooked up in the response partial, to a "response_wrapper" di
   </div>
 
   <span class="font-semibold text-lg opacity-60 tracking-wide">Model</span>
-  <div id="response_wrapper" data-controller="clipboard">
+  <div id="response_wrapper"
+    data-controller="clipboard"
+    class="mb-7">
     <div id="<%= response_id %>"
         data-controller='markdown-text'
         data-markdown-text-updated-value=''
         data-clipboard-target="source"
-        class='prose prose-lg max-w-none border border-blue-500 bg-blue-100 p-4 rounded-xl mb-7'>
+        class='prose prose-lg max-w-none border border-blue-500 bg-blue-100 p-4 rounded-xl mb-2'>
     </div>
-    <%# TODO: Style %>
-    <div id="response_controls">
-      <button data-action="clipboard#copy">
-        Copy to clipboard
+    <div id="response_controls" class="flex justify-end">
+      <button
+        data-clipboard-target="button"
+        data-action="clipboard#copy"
+        class="text-xs uppercase font-semibold tracking-wider border border-gray-400 py-2 px-3 rounded-lg hover:bg-gray-100 transition duration-200 ease-in-out">
+        <span class="opacity-75">Copy</span>
       </button>
     </div>
   </div>
 </div>
+
 ```
 
 ## Project Setup
@@ -685,32 +695,6 @@ Type in your message/question in the text area and click Send.
 * Cancel response? (model could get stuck in a loop...)
 * Keep model in memory longer? (first time load is slow), see Ollama docs, default is 5m: `keep_alive` setting in request body
 * `/api/generate` final response contains statistics, maybe log/save those somewhere. To calculate how fast the response is generated in tokens per second (token/s), divide `eval_count` / `eval_duration`.
-
-### WIP: Copy model response to clipboard
-
-* clipboard stimulusjs controller?
-
-```javascript
-static targets = ["source"]
-
-copy() {
-  text = this.sourceTarget.select();
-  navigator.clipboard.writeText(text)
-    .then(() => {
-      console.log('Text copied to clipboard');
-    })
-    .catch((error) => {
-      console.error('Failed to copy text to clipboard:', error);
-    });
-}
-```
-
-Somewhere in _response.html.erb but has to be outside of the div where broadcasting model response:
-```erb
-<button data-action="markdown#copy">
-  Copy to clipboard
-</button>
-```
 
 ### Temperature and other options
   * Currently its set "flat" in request body, but [Ollama REST API](https://github.com/ollama/ollama/blob/main/docs/api.md#generate-a-completion) says it should be in `options`
