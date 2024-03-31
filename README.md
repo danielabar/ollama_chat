@@ -496,32 +496,93 @@ It will look something like this:
 
 ### Auto Scroll
 
-In the original tutorial, as the conversation grows in length and the model responses keep streaming, it will go outside of the visible viewport, requiring the user to manually scroll. This project adds a scroll command as the last part of the markdown stimulus controller (which only gets invoked when model is done responding), to also scroll to the end of the viewport. Arguably this logic could be in a separate scroll controller:
+In the original tutorial, as the conversation grows in length and the model responses keep streaming, it will go outside of the visible viewport, requiring the user to manually scroll.
+
+This project adds a scroll stimulus controller to the messages container (that contains all the prompt and responses as part of the conversation):
+
+```erb
+<!-- app/views/welcome/index.html.erb -->
+<div class="w-full">
+  <span class="bg-yellow-200 border-yellow-400 text-yellow-700 px-4 py-2 mb-4 rounded-full inline-block">
+    Using model: <%= Rails.application.config.chat["chat_model"] %>
+  </span>
+
+  <%# Subscribe to welcome channel for real-time updates via ActionCable %>
+  <%# Use chat_id so that each connected client will have a unique chat session %>
+  <%= turbo_stream_from @chat_id, "welcome" %>
+
+  <%# Here is where we will stream the responses from the llm %>
+  <%# Eventually this should consist of a sequence of questions and answers %>
+  <div id="messages"
+    data-controller="scroll"
+    data-scroll-delay-value="100"
+    class="overflow-y-auto max-h-[80vh]"></div>
+
+  <%# The user types in their prompt here %>
+  <%= render "form", chat_id: @chat_id %>
+</div>
+
+```
+
+The Stimulus controller registers a MutationObserver that checks if a vertical scroll is needed every time the content of the messages div is modified (which it is from ChatJob broadcasting new content from the streaming LLM response).
 
 ```javascript
-// app/javascript/controllers/markdown_text_controller.js
-import { Controller } from "@hotwired/stimulus"
-import { marked } from "marked"
-import hljs from "highlight.js"
+// app/javascript/controllers/scroll_controller.js
+import { Controller } from "@hotwired/stimulus";
 
-// Connects to data-controller="markdown-text"
 export default class extends Controller {
-  static values = { updated: String }
+  static values = { delay: Number };
 
-  // Anytime `updated` value changes, this function gets called
-  updatedValueChanged() {
-    console.log("=== RUNNING MarkdownTextController#updatedValueChanged ===")
-    const markdownText = this.element.innerText || ""
-    const html = marked.parse(markdownText)
-    console.dir(html)
+  connect() {
+    this.setupObserver();
+  }
 
-    this.element.innerHTML = html
-    this.element.querySelectorAll("pre").forEach((block) => {
-      hljs.highlightElement(block)
-    })
+  /**
+   * Scrolls the element to the bottom after a specified delay.
+   */
+  scrollBottom() {
+    setTimeout(() => {
+      this.element.scrollTop = this.element.scrollHeight;
+    }, this.delayValue || 0);
+  }
 
-    // Scroll to end of viewport.
-    window.scrollTo(0, document.documentElement.scrollHeight);
+  /**
+   * Checks if scrolling is needed and performs scrolling if necessary.
+   * It calculates the difference between the bottom of the scrollable area
+   * and the visible area, and if it exceeds a specified threshold, it calls
+   * the scrollBottom method to perform scrolling.
+   *
+   * scrollHeight:
+   *  measurement of the height of an element's content, including content not visible on the screen due to overflow
+   *
+   * scrollTop:
+   *  gets or sets the number of pixels that an element's content is scrolled vertically
+   *
+   * clientHeight:
+   *  inner height of an element in pixels, includes padding but excludes borders, margins, and horizontal scrollbars
+   */
+  scrollIfNeeded() {
+    const threshold = 25;
+    const bottomDifference = this.element.scrollHeight - this.element.scrollTop - this.element.clientHeight;
+
+    if (Math.abs(bottomDifference) >= threshold) {
+      this.scrollBottom();
+    }
+  }
+
+
+  /**
+   * A method to set up a MutationObserver to watch for changes in the element.
+   */
+  setupObserver() {
+    const observer = new MutationObserver(() => {
+      this.scrollIfNeeded();
+    });
+
+    observer.observe(this.element, {
+      childList: true,
+      subtree: true,
+    });
   }
 }
 ```
