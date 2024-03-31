@@ -6,9 +6,18 @@
   </div>
 
   <span class="font-semibold text-lg opacity-60 tracking-wide">Model</span>
-  <div id="<%= response_id %>"
-      data-controller='markdown-text'
-      data-markdown-text-updated-value=''
-      class='prose prose-lg max-w-none border border-blue-500 bg-blue-100 p-4 rounded-xl mb-7'>
+  <div id="response_wrapper" data-controller="clipboard">
+    <div id="<%= response_id %>"
+        data-controller='markdown-text'
+        data-markdown-text-updated-value=''
+        data-clipboard-target="source"
+        class='prose prose-lg max-w-none border border-blue-500 bg-blue-100 p-4 rounded-xl mb-7'>
+    </div>
+    <%# TODO: Style %>
+    <div id="response_controls">
+      <button data-action="clipboard#copy">
+        Copy to clipboard
+      </button>
+    </div>
   </div>
 </div>

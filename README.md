@@ -14,9 +14,10 @@
     - [Display Conversation](#display-conversation)
     - [Markdown Styling](#markdown-styling)
     - [Auto Scroll](#auto-scroll)
+    - [Copy Model Response to Clipboard](#copy-model-response-to-clipboard)
   - [Project Setup](#project-setup)
   - [Future Features](#future-features)
-    - [Copy model response to clipboard](#copy-model-response-to-clipboard)
+    - [WIP: Copy model response to clipboard](#wip-copy-model-response-to-clipboard)
     - [Temperature and other options](#temperature-and-other-options)
     - [Deal with unescaped html warning from marked/highlight](#deal-with-unescaped-html-warning-from-markedhighlight)
   - [Deployment](#deployment)
@@ -521,7 +522,6 @@ This project adds a scroll stimulus controller to the messages container (that c
   <%# The user types in their prompt here %>
   <%= render "form", chat_id: @chat_id %>
 </div>
-
 ```
 
 The Stimulus controller registers a MutationObserver that checks if a vertical scroll is needed every time the content of the messages div is modified (which it is from ChatJob broadcasting new content from the streaming LLM response).
@@ -587,6 +587,59 @@ export default class extends Controller {
 }
 ```
 
+### Copy Model Response to Clipboard
+
+This project adds a "copy to clipboard" feature. A button renders beneath each model response. When clicked, the model response text is copied to the clipboard. A "clipboard" stimulus JS controller is used for this:
+
+```javascript
+// app/javascript/controllers/clipboard_controller.js
+import { Controller } from "@hotwired/stimulus";
+
+export default class extends Controller {
+  static targets = ["source"]
+
+  copy() {
+    const text = this.sourceTarget.innerText
+    navigator.clipboard.writeText(text)
+      .then(() => {
+        console.log('Text copied to clipboard');
+      })
+      .catch((error) => {
+        console.error('Failed to copy text to clipboard:', error);
+      });
+  }
+}
+```
+
+This controller is hooked up in the response partial, to a "response_wrapper" div that wraps both the response and the copy button. A `data-clipboard-target="source"` is specified on the actual model response div to indicate this is the div that contains the text to be copied:
+
+```erb
+<!-- app/views/chats/_response.html.erb -->
+<div class="response-container">
+  <span class="font-semibold text-lg opacity-60 tracking-wide">You</span>
+  <div id="<%= prompt_id %>"
+      class='max-w-none border border-green-500 bg-green-100 p-4 rounded-xl mb-7'>
+      <p><%= prompt %></p>
+  </div>
+
+  <span class="font-semibold text-lg opacity-60 tracking-wide">Model</span>
+  <div id="response_wrapper" data-controller="clipboard">
+    <div id="<%= response_id %>"
+        data-controller='markdown-text'
+        data-markdown-text-updated-value=''
+        data-clipboard-target="source"
+        class='prose prose-lg max-w-none border border-blue-500 bg-blue-100 p-4 rounded-xl mb-7'>
+    </div>
+    <%# TODO: Style %>
+    <div id="response_controls">
+      <button data-action="clipboard#copy">
+        Copy to clipboard
+      </button>
+    </div>
+  </div>
+</div>
+```
+
 ## Project Setup
 
 Install:
@@ -633,7 +686,7 @@ Type in your message/question in the text area and click Send.
 * Keep model in memory longer? (first time load is slow), see Ollama docs, default is 5m: `keep_alive` setting in request body
 * `/api/generate` final response contains statistics, maybe log/save those somewhere. To calculate how fast the response is generated in tokens per second (token/s), divide `eval_count` / `eval_duration`.
 
-### Copy model response to clipboard
+### WIP: Copy model response to clipboard
 
 * clipboard stimulusjs controller?
 
