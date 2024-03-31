@@ -17,7 +17,5 @@ export default class extends Controller {
     this.element.querySelectorAll("pre").forEach((block) => {
       hljs.highlightElement(block)
     })
-
-    window.scrollTo(0, document.documentElement.scrollHeight);
   }
 }
